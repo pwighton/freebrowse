@@ -7,7 +7,8 @@ import { useSurfaces } from "@/hooks/use-surfaces";
 import { useDrawing } from "@/hooks/use-drawing";
 import { useSave } from "@/hooks/use-save";
 import { useFileLoading } from "@/hooks/use-file-loading";
-import { Niivue } from "@niivue/niivue";
+import { NvSceneController } from "@niivue/nvreact";
+import type { Niivue } from "@niivue/niivue";
 import "../App.css";
 import Header from "./header";
 import Footer from "./footer";
@@ -17,7 +18,7 @@ import RemoveDialog from "./dialogs/remove-dialog";
 import SaveDialog from "./dialogs/save-dialog";
 import SettingsDialog from "./dialogs/settings-dialog";
 
-const nv = new Niivue({
+const scene = new NvSceneController(undefined, {
   loadingText: "Drag-drop images",
   dragAndDropEnabled: true,
   textHeight: 0.02,
@@ -31,7 +32,17 @@ export default function FreeBrowse() {
   const footerOpen = useFreeBrowseStore((s) => s.footerOpen);
   const darkMode = useFreeBrowseStore((s) => s.darkMode);
 
-  const nvRef = useRef<Niivue | null>(nv);
+  const nvRef = useRef<Niivue | null>(null);
+
+  // Populate nvRef when NvSceneController creates the viewer.
+  // This runs during render (before effects), so by the time NvScene's
+  // useEffect calls addViewer → onViewerCreated, nvRef gets populated
+  // before any FreeBrowse hook effects run.
+  scene.onViewerCreated = (nv, index) => {
+    if (index === 0) {
+      nvRef.current = nv;
+    }
+  };
 
   // --- Hooks ---
   const {
@@ -125,8 +136,7 @@ export default function FreeBrowse() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col min-h-0">
           <CanvasArea
-            nvInstance={nv}
-            viewMode={viewerOptions.viewMode}
+            scene={scene}
             onFileUpload={handleFileUpload}
           />
 

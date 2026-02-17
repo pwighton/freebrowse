@@ -1,29 +1,31 @@
 import { useFreeBrowseStore } from "@/store";
+import { NvScene, type NvSceneController } from "@niivue/nvreact";
+import { cn } from "@/lib/utils";
 import ImageUploader from "./image-uploader";
-import ImageCanvas from "./image-canvas";
-import type { ViewMode } from "@/store/types";
-import type { Niivue } from "@niivue/niivue";
 
 interface CanvasAreaProps {
-  nvInstance: Niivue;
-  viewMode: ViewMode;
+  scene: NvSceneController;
   onFileUpload: (files: File[]) => void;
 }
 
-export default function CanvasArea({ nvInstance, viewMode, onFileUpload }: CanvasAreaProps) {
+export default function CanvasArea({ scene, onFileUpload }: CanvasAreaProps) {
   const showUploader = useFreeBrowseStore((s) => s.showUploader);
 
   return (
     <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
-      {showUploader ? (
+      {showUploader && (
         <div className="flex flex-1 items-center justify-center">
           <ImageUploader onUpload={onFileUpload} />
         </div>
-      ) : (
-        <div className="flex flex-1">
-          <ImageCanvas viewMode={viewMode} nvRef={nvInstance} />
-        </div>
       )}
+      <NvScene
+        scene={scene}
+        className={cn(
+          "w-full h-full relative bg-[#111]",
+          showUploader && "hidden",
+        )}
+        style={{ position: "relative" }}
+      />
     </main>
   );
 }

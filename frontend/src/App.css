@@ -27,7 +27,11 @@ canvas {
   display: block;
 }
 
+.niivue-canvas-container {
+  overflow: hidden;
+}
+
 .niivue-canvas {
   width: 100%;
-  height: 95%;
+  height: 100%;
 }
