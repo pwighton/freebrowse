@@ -14,7 +14,7 @@ The following features are only available in Fullstack mode:
 ## Loading data
 -------------------------------------------------------------------
 
-Data can either be loaded from disk, via URL or from the backend (Fullstack mode only)
+Data can either be loaded from disk, via URL or, in Fullstack mode, from the backend.
 
 ### Loading data from disk
 
@@ -65,11 +65,11 @@ The URL parameters `vol` and `nvd` can be used to generate links that will autom
 - [This URL](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/freesurfer/freebrowse/main/data/remote/mni152-hippo.nvd) will load the [this niivue document](https://github.com/freesurfer/freebrowse/blob/main/data/remote/mni152-hippo.nvd) from the FreeBrowse github repository
 - [This URL](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/main/openneuro/ds002785/sub-0001.nvd) will load [this niivue document](https://github.com/pwighton/freebrowse-test-data/blob/main/openneuro/ds002785/sub-0001.nvd) which was sutomatically generated using [this openneuro crawler](https://github.com/pwighton/openneuro-crawl) (work-in-progress)
 - **Note:** to reference a file on github, the [`raw.githubusercontent.com`](https://stackoverflow.com/questions/39065921/what-do-raw-githubusercontent-com-urls-represent) URL must be used.
-  - **Note:** Niivue documents designed for use with Fullstack mode (i.e. the `.nvd` files in [`data/local`](https://github.com/freesurfer/freebrowse/tree/main/data/local)) will fail to load when niivue is in Serverless mode.
+- **Note:** Niivue documents designed for use with Fullstack mode (i.e. the `.nvd` files in [`data/local`](https://github.com/freesurfer/freebrowse/tree/main/data/local)) will fail to load when niivue is in Serverless mode.
   
 ### Loading data from the backend (Fullstack mode only)
 
-When running FreeBrowse in Fullstack mode, volumes and niivue documents can be loaded from the backend.  By default, the `/data/` folder of the repository is served by the backend webserver (the folder location can be changed via the [`DATA_DIR` environment variable in `pixi.toml`](https://github.com/freesurfer/freebrowse/blob/88493596a6d598348902925abce18eeaf2e941cb/backend/pixi.toml#L19)).  Any volumetric file (`.nii`, `.nii.gz`, `.mgz`) or niivue document (`.nvd`) can be loaded directly from the backend
+When running FreeBrowse in Fullstack mode, volumes and niivue documents can be loaded from the backend.  By default, the `data/` folder of the repository is served by the backend webserver (the folder location can be changed via the [`DATA_DIR` environment variable in `pixi.toml`](https://github.com/freesurfer/freebrowse/blob/88493596a6d598348902925abce18eeaf2e941cb/backend/pixi.toml#L19)).  Any volumetric file (`.nii`, `.nii.gz`, `.mgz`) or niivue document (`.nvd`) can be loaded directly from the backend
 
 #### Load a volume from the backend
 
@@ -85,10 +85,88 @@ When running FreeBrowse in Fullstack mode, volumes and niivue documents can be l
 - Select the niivue document you wish to load
 - The scene defined by the niivue document will *replace* the current scene
 
+## Navigation
+-------------------------------------------------------------------
+
+The FreeBrowse UI is subdivided into 4 parts
+- The top panel
+- The main viewing area
+- The sidebar
+- The bottom panel
+
+### Top panel
+
+The top panel consists of 4 components
+- The version number
+- The view mode selector
+- The drag mode selector
+- The settings
+
+#### The version number
+
+This simply tells you which version of FreeBrowse is running and links you to the main github repository
+
+#### The view mode selector
+
+The view model selector allows you to choose between the following views:
+- Axial
+- Coronal
+- Saggital
+- Render: A 3D rendering of the scene
+- ACS: Simultaneously view the 3 cardinal views
+- ACSR: Simultaneously view the 3 cardinal views plus a 3D rendering of the scene
+
+#### The drag mode selector
+
+The drag mode slector defines the behavior of the right and middle mouse buttons.
+
+- **contrast:**  When in contrast mode:
+  - Scrolling with the middle button will scroll through the slices of the particular view.  e.g. if you mouse over a saggital view and scroll, the slices will scroll in the saggital direction.
+  - Dragging with the middle button will pan the volumes 
+  - Dragging with the right-mouse button will define a region.  The contrast of the first volumetric layer will be automatically adjusted for the voxels within the defined region
+- **pan/zoom:**  When in contrast mode:
+  - Scrolling with the middle button will zoom in or out of the volumes
+  - Dragging with the middle button will pan the volumes 
+  - Dragging with the right-mouse button will pan the volumes
+
+#### The settings
+
+To the very right of top panel are four buttons:
+
+- The first toggles the display of the sidebar
+- The second toggles the display of the bottom panel
+- The third toggles between dark mode and light mode
+- The fourth allows the configuration of additional FreeBrowse settings
+
+### Sidebar
+
+The sidebar consists of the following tabs, whose usage is explained elsewhere
+
+- Volumetric Details
+- Surface Details
+- Drawing Tools
+- AI annotation (Fullstack mode only)
+- Backend: NiiVue Documents (Fullstack mode only)
+- Backend: Imaging Data (Fullstack mode only)
+
+### Bottom panel
+
+When you left click in the main viewing area, the bottom panel will show information related to the voxel selected:
+- The RAS coordiantes of the voxel selected are displayed
+- For each volume loaded:
+  - The voxel coordiantes of the voxel selected are displayed
+  - The voxel value of the voxel selected is displayed 
+
+## Creating Annotations
+-------------------------------------------------------------------
+
+## AI Annotation (experimental)
+-------------------------------------------------------------------
+
 ## Saving data
 -------------------------------------------------------------------
 
-Data can either be saved to disk or, in Fullstack mode, to the backend.
+Volumetric data and NiiVue documents can either be saved locally to disk or, in Fullstack mode, to the backend.  Saving surfaces, and saving niivue documents with surfaces, is currently not supported
 
 ### Saving data to disk
 
@@ -104,24 +182,6 @@ Data can either be saved to disk or, in Fullstack mode, to the backend.
 
 - Explain differences between saving niivue documents to disk vs backend
 - Since editing of surfaces is not supported, saving of surfaces is not supported
-
-## Navigation
--------------------------------------------------------------------
-
-### Top panel
-
-- View Modes
-- Drag Modes
-- Settings
-
-### Sidebar
-
-- Volumetric Details
-- Surface Details
-- Drawing Tools
-- AI annotation (Fullstack mode only)
-- Backend: NiiVue Documents (Fullstack mode only)
-- Backend: Imaging Data (Fullstack mode only)
 
 ### Footer
 
@@ -140,9 +200,6 @@ Data can either be saved to disk or, in Fullstack mode, to the backend.
   - Select the surface you wish to add a overlay layer to
   - Select the 'Add ' button next to 'Layers'
   - ![Surface Layer Add](img/surf-layers-add.png)
-  
-## AI Annotation (experimental)
--------------------------------------------------------------------
 
 ## Other Modes of operation
 -------------------------------------------------------------------
