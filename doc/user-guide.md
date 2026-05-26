@@ -23,10 +23,12 @@ Data can either be loaded from disk, via URL or from the backend (Fullstack mode
 - **Load a volume from disk**:
   - When no data is loaded, you can click 'Select Files' in the center of the display, or drag volumetric files from your file browser.  Currelty, nifti (`.nii`, `.nii.gz`) and [`.mgz`](https://surfer.nmr.mgh.harvard.edu/fswiki/FsTutorial/MghFormat) are supported
     - ![Select Files](img/select-file.png)
-  - When data is already loaded, you can add volumetric data to the current scene by selecting the 'Volumetric Details' tab in the sidebar, and selecting 'Load volumes'.
+  - When data is already loaded, you can add volumetric data to the current scene by selecting the 'Volumetric Details' tab in the sidebar
+    - ![Volumetric Details](img/vol-details.png)
+    - And then selecting 'Load volumes'
+    - ![Load volumes](img/load-vol.png)
 
-
-- Load surface
+- **Load a surface from disk**
 - Load niivue document
 
 ### Loading data via URL
