@@ -20,7 +20,7 @@ Try out the 'serverless' version: [https://freesurfer.github.io/freebrowse/](htt
 - [A FreeSurfer segmentation overlayed on a t1-weighted anatomical MRI; from openneuro.org](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/refs/heads/main/openneuro/ds004731/sub-SM07.nvd)
 - [FreeSurfer surfaces overlayed on a t1-weighted anatomical MRI showing volume/surface intersections](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/main/freesurfer/surfaces/mgz-surf-eg.nvd)
 - [A FreeSurfer surface with a curvature overlay](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/refs/heads/main/freesurfer/surfaces/surf-overlay-eg.nvd)
-- [PET binding potentials overlayed on an MNI template](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/main/pet/petsurfer-bids/petsurfer-km.nvd)
+- [PET total volume of distribution (VT) overlaid on an MNI template](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/main/pet/petsurfer-bids/petsurfer-km.nvd)
 - [4D PET data](https://freesurfer.github.io/freebrowse/?nvd=https://raw.githubusercontent.com/pwighton/freebrowse-test-data/main/pet/4d-eg.nvd)
   - This one may take some time to load.  Niivue has optimizations for 4d data which have yet to be implemented
 
