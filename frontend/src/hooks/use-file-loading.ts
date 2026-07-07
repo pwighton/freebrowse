@@ -221,14 +221,22 @@ export function useFileLoading(
           return;
         }
 
-        // MIGRATION-TODO(P3): surface loading moves to
-        // nv.loadMeshes([{ url: File, name, color, shaderType }]) — File is
-        // accepted directly (no blob URL), rgba255 -> color, meshShaderIndex ->
-        // shaderType name. Disabled until the meshes phase.
-        void files;
-        console.warn("handleSurfaceFileChange: surface loading disabled during niivue-mono migration (P3)");
-
-        updateSurfaceDetails();
+        // addMesh (not loadMeshes) — loadMeshes replaces all meshes; addMesh
+        // appends. niivue-mono accepts a File directly (no blob URL), a 0-1
+        // `color`, and a shader `shaderType` name. The surfaces list follows via
+        // meshLoaded -> event adapter.
+        try {
+          for (const file of files) {
+            await nv.addMesh({
+              url: file,
+              name: file.name,
+              color: [1, 1, 0, 1] as [number, number, number, number],
+              shaderType: "phong",
+            });
+          }
+        } catch (error) {
+          console.error("Error loading surface files:", error);
+        }
 
         if (currentSurfaceIndex === null && nv.meshes.length > 0) {
           setCurrentSurfaceIndex(nv.meshes.length - files.length);

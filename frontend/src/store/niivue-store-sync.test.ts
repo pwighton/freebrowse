@@ -79,6 +79,29 @@ describe("createStoreSyncTarget — niivue events drive the store", () => {
     teardown();
   });
 
+  test("rebuilds the surfaces list from nv.meshes (color->rgba255, shaderType)", async () => {
+    const { nv, teardown } = wire();
+    await nv.addMesh({
+      url: "lh.white",
+      name: "LH",
+      color: [1, 0, 0, 1],
+      shaderType: "matcap",
+    });
+    const surfaces = useFreeBrowseStore.getState().surfaces;
+    const s = surfaces[surfaces.length - 1];
+    expect(s.name).toBe("LH");
+    expect(s.rgba255).toEqual([255, 0, 0, 255]);
+    expect(s.shaderType).toBe("matcap");
+    expect(s.visible).toBe(true);
+
+    // Visibility is opacity-derived (niivue-mono has no rendered mesh.visible).
+    await nv.setMesh(nv.meshes.length - 1, { opacity: 0 });
+    const after = useFreeBrowseStore.getState().surfaces;
+    expect(after[after.length - 1].visible).toBe(false);
+    expect(after[after.length - 1].opacity).toBe(0);
+    teardown();
+  });
+
   test("mirrors locationChange into locationData", () => {
     const { nv, teardown } = wire();
     nv.emit("locationChange", {

@@ -18,13 +18,12 @@ import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 interface SurfaceDetailsTabProps {
   nvRef: React.RefObject<Niivue | null>;
-  onToggleVisibility: (id: string) => void;
+  onToggleVisibility: (index: number) => void;
   onRemoveSurface: (index: number) => void;
   onAddSurfaceFiles: () => void;
   onOpacityChange: (value: number) => void;
   onColorChange: (hexColor: string) => void;
   onShaderChange: (shaderName: string) => void;
-  getMeshShaderName: (index: number) => string;
   // Layer operations
   getLayers: () => any[];
   onAddLayerFiles: () => void;
@@ -44,7 +43,6 @@ export default function SurfaceDetailsTab({
   onOpacityChange,
   onColorChange,
   onShaderChange,
-  getMeshShaderName,
   getLayers,
   onAddLayerFiles,
   onRemoveLayer,
@@ -92,7 +90,7 @@ export default function SurfaceDetailsTab({
                       className="h-6 w-6 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onToggleVisibility(surface.id);
+                        onToggleVisibility(index);
                       }}
                     >
                       {surface.visible ? (
@@ -172,7 +170,7 @@ export default function SurfaceDetailsTab({
                   Mesh Shader
                 </Label>
                 <Select
-                  value={getMeshShaderName(surfaces[currentSurfaceIndex]?.meshShaderIndex || 0)}
+                  value={surfaces[currentSurfaceIndex]?.shaderType || "phong"}
                   onChange={(e) => onShaderChange(e.target.value)}
                 >
                   {nvRef.current?.meshShaders.map((shaderName: string) => (

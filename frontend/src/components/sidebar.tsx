@@ -41,12 +41,11 @@ interface SidebarProps {
   onMoveVolumeUp: () => void;
   onMoveVolumeDown: () => void;
   // Surface operations
-  onToggleSurfaceVisibility: (id: string) => void;
+  onToggleSurfaceVisibility: (index: number) => void;
   onRemoveSurfaceClick: (index: number) => void;
   onSurfaceOpacityChange: (value: number) => void;
   onSurfaceColorChange: (hexColor: string) => void;
   onMeshShaderChange: (shaderName: string) => void;
-  getMeshShaderName: (index: number) => string;
   // Layer operations
   getLayers: () => any[];
   onAddLayerFiles: () => void;
@@ -178,7 +177,6 @@ export default function Sidebar(props: SidebarProps) {
             onOpacityChange={props.onSurfaceOpacityChange}
             onColorChange={props.onSurfaceColorChange}
             onShaderChange={props.onMeshShaderChange}
-            getMeshShaderName={props.getMeshShaderName}
             getLayers={props.getLayers}
             onAddLayerFiles={props.onAddLayerFiles}
             onRemoveLayer={props.onRemoveLayer}

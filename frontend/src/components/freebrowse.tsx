@@ -63,7 +63,6 @@ export default function FreeBrowse() {
     handleSurfaceOpacityChange,
     handleSurfaceColorChange,
     handleMeshShaderChange,
-    getMeshShaderName,
   } = useSurfaces(nvRef, debouncedGLUpdate);
   const {
     layerFileInputRef,
@@ -178,7 +177,6 @@ export default function FreeBrowse() {
           onSurfaceOpacityChange={handleSurfaceOpacityChange}
           onSurfaceColorChange={handleSurfaceColorChange}
           onMeshShaderChange={handleMeshShaderChange}
-          getMeshShaderName={getMeshShaderName}
           getLayers={getLayers}
           onAddLayerFiles={handleAddLayerFiles}
           onRemoveLayer={removeLayerFromMesh}

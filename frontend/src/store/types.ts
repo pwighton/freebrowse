@@ -6,7 +6,8 @@ export type SurfaceDetails = {
   visible: boolean;
   opacity: number;
   rgba255: [number, number, number, number];
-  meshShaderIndex: number;
+  // niivue-mono identifies mesh shaders by name (e.g. 'phong'), not an index.
+  shaderType: string;
 };
 
 export type ViewMode = "axial" | "coronal" | "sagittal" | "ACS" | "ACSR" | "render";
