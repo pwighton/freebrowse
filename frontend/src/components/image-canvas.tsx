@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useState } from "react"
-import { Niivue } from '@niivue/niivue'
+import { NiiVueGPU as Niivue } from '@niivue/niivue'
 import { sliceTypeMap } from "@/lib/niivue-helpers"
 
 // Re-export for backwards compatibility during refactor
@@ -24,7 +24,7 @@ export default function ImageCanvas({ viewMode, nvRef }: ImageCanvasProps) {
     if (!canvas) return
     if (!nv) return
     nv.attachToCanvas(canvas)
-    nv.setSliceType(sliceTypeMap[viewMode]?.sliceType || 0) // Default to axial if viewMode is invalid;
+    nv.sliceType = sliceTypeMap[viewMode]?.sliceType || 0 // Default to axial if viewMode is invalid;
     setImageLoaded(true)
   }, [])
 

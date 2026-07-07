@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import ViewSelector from "@/components/view-selector";
 import DragModeSelector from "@/components/drag-mode-selector";
 import { cn } from "@/lib/utils";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 interface HeaderProps {
   nvRef: React.RefObject<Niivue | null>;

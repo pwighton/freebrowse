@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { rgba255ToHex } from "@/lib/niivue-helpers";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 interface SurfaceDetailsTabProps {
   nvRef: React.RefObject<Niivue | null>;
@@ -175,7 +175,7 @@ export default function SurfaceDetailsTab({
                   value={getMeshShaderName(surfaces[currentSurfaceIndex]?.meshShaderIndex || 0)}
                   onChange={(e) => onShaderChange(e.target.value)}
                 >
-                  {nvRef.current?.meshShaderNames(true).map((shaderName: string) => (
+                  {nvRef.current?.meshShaders.map((shaderName: string) => (
                     <option key={shaderName} value={shaderName}>
                       {shaderName}
                     </option>
@@ -268,7 +268,7 @@ export default function SurfaceDetailsTab({
                         value={selectedLayer.colormap || "warm"}
                         onChange={(e) => onLayerColormapChange(e.target.value)}
                       >
-                        {nvRef.current?.colormaps().map((cm: string) => (
+                        {nvRef.current?.colormaps.map((cm: string) => (
                           <option key={cm} value={cm}>
                             {cm}
                           </option>

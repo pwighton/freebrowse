@@ -2,7 +2,7 @@ import { useFreeBrowseStore } from "@/store";
 import ImageUploader from "./image-uploader";
 import ImageCanvas from "./image-canvas";
 import type { ViewMode } from "@/store/types";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 interface CanvasAreaProps {
   nvInstance: Niivue;

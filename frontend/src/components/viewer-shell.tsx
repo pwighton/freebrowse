@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 import type { ViewMode } from "@/store/types";
 import Header from "./header";
 import Footer from "./footer";

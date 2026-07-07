@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 export function useSurfaces(
   nvRef: React.RefObject<Niivue | null>,
@@ -56,18 +56,16 @@ export function useSurfaces(
         surfaces.map((surf, index) => {
           if (surf.id === id) {
             const newVisible = !surf.visible;
-            if (nvRef.current) {
-              nvRef.current.setMeshProperty(index, "visible", newVisible);
-            }
+            // MIGRATION-TODO(P3): apply mesh visibility via new niivue-mono mesh API
+            void index;
+            console.warn(
+              "toggleSurfaceVisibility: disabled during niivue-mono migration (P3)",
+            );
             return { ...surf, visible: newVisible };
           }
           return surf;
         }),
       );
-
-      if (nvRef.current) {
-        nvRef.current.updateGLVolume();
-      }
     },
     [surfaces, nvRef, setSurfaces],
   );
@@ -75,9 +73,11 @@ export function useSurfaces(
   const removeSurface = useCallback(
     (surfaceIndex: number) => {
       if (nvRef.current && surfaces[surfaceIndex]) {
-        const mesh = nvRef.current.meshes[surfaceIndex];
-        if (mesh) {
-          nvRef.current.removeMesh(mesh);
+        {
+          // MIGRATION-TODO(P3): remove mesh via index-based niivue-mono removeMesh
+          console.warn(
+            "removeSurface: disabled during niivue-mono migration (P3)",
+          );
           updateSurfaceDetails();
 
           if (currentSurfaceIndex === surfaceIndex) {
@@ -119,8 +119,11 @@ export function useSurfaces(
         nvRef.current &&
         surfaces[currentSurfaceIndex]
       ) {
-        nvRef.current.setMeshProperty(currentSurfaceIndex, "opacity", newOpacity);
-        debouncedGLUpdate();
+        // MIGRATION-TODO(P3): set mesh opacity via new niivue-mono mesh API
+        console.warn(
+          "handleSurfaceOpacityChange: disabled during niivue-mono migration (P3)",
+        );
+        void debouncedGLUpdate;
 
         setSurfaces((prevSurfaces) =>
           prevSurfaces.map((surf, index) =>
@@ -158,11 +161,11 @@ export function useSurfaces(
         }
         const meshIndex = currentSurfaceIndex;
         surfaceColorTimeoutRef.current = setTimeout(() => {
-          if (nvRef.current) {
-            const rgba255 = new Uint8Array([r, g, b, 255]);
-            nvRef.current.setMeshProperty(meshIndex, "rgba255", rgba255);
-            nvRef.current.updateGLVolume();
-          }
+          // MIGRATION-TODO(P3): set mesh rgba255 color via new niivue-mono mesh API
+          void meshIndex;
+          console.warn(
+            "handleSurfaceColorChange: disabled during niivue-mono migration (P3)",
+          );
         }, 50);
       }
     },
@@ -176,14 +179,17 @@ export function useSurfaces(
         nvRef.current &&
         surfaces[currentSurfaceIndex]
       ) {
-        nvRef.current.setMeshShader(currentSurfaceIndex, shaderName);
-        const shaderIndex = nvRef.current.meshShaderNameToNumber(shaderName) ?? 0;
-        debouncedGLUpdate();
+        // MIGRATION-TODO(P3): set mesh shader + resolve shader index via new niivue-mono mesh shader API
+        void shaderName;
+        void debouncedGLUpdate;
+        console.warn(
+          "handleMeshShaderChange: disabled during niivue-mono migration (P3)",
+        );
 
         setSurfaces((prevSurfaces) =>
           prevSurfaces.map((surf, index) =>
             index === currentSurfaceIndex
-              ? { ...surf, meshShaderIndex: shaderIndex }
+              ? { ...surf, meshShaderIndex: surf.meshShaderIndex }
               : surf,
           ),
         );
@@ -194,9 +200,13 @@ export function useSurfaces(
 
   const getMeshShaderName = useCallback(
     (index: number): string => {
+      // MIGRATION-TODO(P3): resolve mesh shader name by index via new niivue-mono mesh shader API
+      void index;
       if (!nvRef.current) return "Phong";
-      const shaderNames = nvRef.current.meshShaderNames(false);
-      return shaderNames[index] || "Phong";
+      console.warn(
+        "getMeshShaderName: disabled during niivue-mono migration (P3)",
+      );
+      return "Phong";
     },
     [nvRef],
   );

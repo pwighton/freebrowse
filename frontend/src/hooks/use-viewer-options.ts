@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
 import { sliceTypeMap } from "@/lib/niivue-helpers";
-import { DRAG_MODE, type Niivue } from "@niivue/niivue";
+import { DRAG_MODE, type NiiVueGPU as Niivue } from "@niivue/niivue";
 import type { DragMode } from "@/components/drag-mode-selector";
 import type { ViewMode } from "@/store/types";
 
@@ -45,40 +45,29 @@ export function useViewerOptions(
       const viewConfig = sliceTypeMap[viewerOptions.viewMode];
       console.log("applyViewerOptions() -- viewConfig: ", viewConfig);
 
-      nvRef.current.opts.crosshairWidth = viewerOptions.crosshairVisible
+      nvRef.current.crosshairWidth = viewerOptions.crosshairVisible
         ? viewerOptions.crosshairWidth
         : 0;
-      nvRef.current.opts.crosshairGap = viewerOptions.crosshairGap;
-      nvRef.current.setCrosshairColor(viewerOptions.crosshairColor);
-      nvRef.current.opts.rulerWidth = viewerOptions.rulerWidth;
-      nvRef.current.opts.isRuler = viewerOptions.rulerVisible;
-      nvRef.current.setInterpolation(!viewerOptions.interpolateVoxels);
-      nvRef.current.opts.dragMode = DRAG_MODE[viewerOptions.dragMode];
-      nvRef.current.overlayOutlineWidth = viewerOptions.overlayOutlineWidth;
-      nvRef.current.opts.isColorbar = viewerOptions.isColorbar;
-      // setRadiologicalConvention() calls updateGLVolume() internally, which
-      // re-uploads every volume's 3D texture to the GPU — expensive.
-      // applyViewerOptions() runs on every viewer change (e.g. switching
-      // Axial/Coronal), so only call it when the value actually changed,
-      // otherwise each view click pays for a needless texture reload.
-      // NOTE: any other niivue call that internally triggers
-      // updateGLVolume()/refreshLayers() should be guarded the same way if
-      // added here in future.
-      if (
-        nvRef.current.opts.isRadiologicalConvention !==
-        viewerOptions.isRadiologicalConvention
-      ) {
-        nvRef.current.setRadiologicalConvention(
-          viewerOptions.isRadiologicalConvention,
-        );
-      }
-      nvRef.current.opts.sagittalNoseLeft = viewerOptions.sagittalNoseLeft;
+      nvRef.current.crosshairGap = viewerOptions.crosshairGap;
+      nvRef.current.crosshairColor = viewerOptions.crosshairColor;
+      nvRef.current.rulerWidth = viewerOptions.rulerWidth;
+      nvRef.current.isRulerVisible = viewerOptions.rulerVisible;
+      nvRef.current.volumeIsNearestInterpolation = !viewerOptions.interpolateVoxels;
+      nvRef.current.secondaryDragMode = DRAG_MODE[viewerOptions.dragMode];
+      nvRef.current.volumeOutlineWidth = viewerOptions.overlayOutlineWidth;
+      nvRef.current.isColorbarVisible = viewerOptions.isColorbar;
+      // In niivue-mono the radiological setter is a flat property; assigning the
+      // same value is cheap (no forced texture reload), so the previous
+      // change-guard is no longer needed.
+      nvRef.current.isRadiological = viewerOptions.isRadiologicalConvention;
+      // MIGRATION-TODO(P2): `sagittalNoseLeft` has no niivue-mono equivalent;
+      // the Settings toggle is being retired. No-op for now.
 
       if (viewConfig) {
-        nvRef.current.opts.multiplanarShowRender = viewConfig.showRender;
-        nvRef.current.setSliceType(viewConfig.sliceType);
+        nvRef.current.showRender = viewConfig.showRender;
+        nvRef.current.sliceType = viewConfig.sliceType;
       } else {
-        nvRef.current.setSliceType(0);
+        nvRef.current.sliceType = 0;
       }
     }
   }, [viewerOptions, nvRef]);
@@ -89,7 +78,7 @@ export function useViewerOptions(
 
       let viewMode: ViewMode = "ACS";
       for (const [mode, config] of Object.entries(sliceTypeMap)) {
-        if (config.sliceType === nv.opts.sliceType) {
+        if (config.sliceType === nv.sliceType) {
           viewMode = mode as ViewMode;
           break;
         }
@@ -97,7 +86,7 @@ export function useViewerOptions(
 
       let dragMode: DragMode = "contrast";
       for (const [mode, value] of Object.entries(DRAG_MODE)) {
-        if (value === nv.opts.dragMode) {
+        if (value === nv.secondaryDragMode) {
           dragMode = mode as DragMode;
           break;
         }
@@ -105,20 +94,21 @@ export function useViewerOptions(
 
       setViewerOptions({
         viewMode,
-        crosshairWidth: nv.opts.crosshairWidth,
-        crosshairGap: nv.opts.crosshairGap ?? 10,
-        crosshairVisible: nv.opts.crosshairWidth > 0,
-        crosshairColor: nv.opts.crosshairColor
-          ? ([...nv.opts.crosshairColor] as [number, number, number, number])
+        crosshairWidth: nv.crosshairWidth,
+        crosshairGap: nv.crosshairGap ?? 10,
+        crosshairVisible: nv.crosshairWidth > 0,
+        crosshairColor: nv.crosshairColor
+          ? ([...nv.crosshairColor] as [number, number, number, number])
           : [1.0, 0.88, 0.88, 1.0],
-        rulerWidth: nv.opts.rulerWidth ?? 1.0,
-        rulerVisible: nv.opts.isRuler ?? false,
-        interpolateVoxels: !nv.opts.isNearestInterpolation,
+        rulerWidth: nv.rulerWidth ?? 1.0,
+        rulerVisible: nv.isRulerVisible ?? false,
+        interpolateVoxels: !nv.volumeIsNearestInterpolation,
         dragMode,
-        overlayOutlineWidth: nv.overlayOutlineWidth,
-        isColorbar: nv.opts.isColorbar ?? false,
-        isRadiologicalConvention: nv.opts.isRadiologicalConvention ?? false,
-        sagittalNoseLeft: nv.opts.sagittalNoseLeft ?? false,
+        overlayOutlineWidth: nv.volumeOutlineWidth,
+        isColorbar: nv.isColorbarVisible ?? false,
+        isRadiologicalConvention: nv.isRadiological ?? false,
+        // MIGRATION-TODO(P2): sagittalNoseLeft retired; keep store default.
+        sagittalNoseLeft: false,
       });
     }
   }, [nvRef, setViewerOptions]);
@@ -180,7 +170,7 @@ export function useViewerOptions(
       }
       crosshairColorTimeoutRef.current = setTimeout(() => {
         if (nvRef.current) {
-          nvRef.current.setCrosshairColor([r, g, b, a]);
+          nvRef.current.crosshairColor = [r, g, b, a];
           nvRef.current.updateGLVolume();
         }
         setViewerOptions((prev) => ({
@@ -238,7 +228,7 @@ export function useViewerOptions(
     (value: number) => {
       setViewerOptions((prev) => ({ ...prev, overlayOutlineWidth: value }));
       if (nvRef.current) {
-        nvRef.current.overlayOutlineWidth = value;
+        nvRef.current.volumeOutlineWidth = value;
         debouncedGLUpdate();
       }
     },
@@ -252,18 +242,19 @@ export function useViewerOptions(
     const nv = nvRef.current;
     if (!nv) return;
 
-    // View: zoom + pan + crosshair centering (niivue INITIAL_SCENE_DATA defaults)
-    nv.scene.volScaleMultiplier = 1.0; // 3D zoom
-    nv.scene.pan2Dxyzmm = [0, 0, 0, 1]; // 2D pan + zoom
-    nv.scene.crosshairPos = [0.5, 0.5, 0.5]; // center (fractional coords)
+    // View: zoom + pan + crosshair centering (niivue scene defaults)
+    nv.scaleMultiplier = 1.0; // 3D zoom
+    nv.pan2Dxyzmm = [0, 0, 0, 1]; // 2D pan + zoom
+    nv.crosshairPos = [0.5, 0.5, 0.5]; // center (fractional coords)
 
     // View: 3D rotation -> niivue defaults
-    nv.setRenderAzimuthElevation(110, 10);
+    nv.azimuth = 110;
+    nv.elevation = 10;
 
     // Contrast: every volume back to its robust (2-98%) range
     for (const vol of nv.volumes ?? []) {
-      if (vol.robust_min !== undefined) vol.cal_min = vol.robust_min;
-      if (vol.robust_max !== undefined) vol.cal_max = vol.robust_max;
+      if (vol.robustMin !== undefined) vol.calMin = vol.robustMin;
+      if (vol.robustMax !== undefined) vol.calMax = vol.robustMax;
     }
 
     nv.updateGLVolume(); // re-render with new contrast

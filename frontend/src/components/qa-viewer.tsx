@@ -3,7 +3,7 @@ import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useLocation } from "@/hooks/use-location";
 import { useVolumes } from "@/hooks/use-volumes";
 import { useFileLoading } from "@/hooks/use-file-loading";
-import { Niivue } from "@niivue/niivue";
+import { NiiVueGPU as Niivue } from "@niivue/niivue";
 import { PanelRight } from "lucide-react";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
@@ -11,14 +11,14 @@ import QaSidebar from "./qa-sidebar";
 import SettingsDialog from "./dialogs/settings-dialog";
 
 const nv = new Niivue({
-  loadingText: "",
-  dragAndDropEnabled: false,
-  textHeight: 0.02,
-  backColor: [0, 0, 0, 1],
+  // MIGRATION-TODO(P2): tune fontScale (was textHeight=0.02, different units).
+  backend: "webgl2", // pin during migration; auto-select in P6
+  placeholderText: "",
+  isDragDropEnabled: false,
+  backgroundColor: [0, 0, 0, 1],
   crosshairColor: [1.0, 0.88, 0.88, 1.0],
   crosshairWidth: 0.3,
   crosshairGap: 10,
-  multiplanarForceRender: false,
 });
 
 const noopSurface = () => {};

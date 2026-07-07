@@ -1,27 +1,15 @@
-import { Niivue, NVImage } from "@niivue/niivue";
-
 /**
  * Neutralize niivue's public save-to-disk API for secure deployments.
  *
- * Hiding the Download button stops the obvious path; this additionally no-ops
- * the underlying niivue methods so a well-intentioned user poking the browser
- * console (`nv.saveImage(...)`, `nv.volumes[0].saveToDisk(...)`, ...) doesn't
- * trivially exfiltrate data. It is NOT a defense against a malicious user — the
- * pixels are still on the GPU — it raises the bar for honest mistakes.
- *
- * Patched at the prototype level: there is effectively one Niivue instance, and
- * this also covers the QA viewer and any volumes loaded later.
+ * STUB during the niivue-mono migration: the old prototype-patching approach
+ * targeted `NVImage.prototype` (NVImage is now a type, not a class) and
+ * `Niivue.prototype.{saveImage,saveScene,saveHTML,saveDocument}` (the class was
+ * renamed to NiiVueGPU and the method names changed), none of which exist in the
+ * new API. Re-implementing the real export lockdown is deferred to P6.
  */
 export function applyExportLockdown(): void {
-  const emptyBytes = async (): Promise<Uint8Array> => new Uint8Array();
-
-  // Per-volume export (NVImage).
-  NVImage.prototype.saveToDisk = emptyBytes;
-  NVImage.prototype.saveToUint8Array = emptyBytes;
-
-  // Whole-instance export (Niivue).
-  Niivue.prototype.saveImage = async () => false;
-  Niivue.prototype.saveScene = async () => {};
-  Niivue.prototype.saveHTML = async () => {};
-  Niivue.prototype.saveDocument = async () => {};
+  console.warn(
+    "applyExportLockdown: disabled during niivue-mono migration (P6)",
+  );
+  // MIGRATION-TODO(P6): re-implement export lockdown by patching NiiVueGPU.prototype.{saveVolume,saveDrawing,saveMesh,saveBitmap,saveDocument,serializeDocument}
 }

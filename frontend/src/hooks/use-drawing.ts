@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { NVImage, type Niivue } from "@niivue/niivue";
+import { type NiiVueGPU as Niivue } from "@niivue/niivue";
 
 export function useDrawing(
   nvRef: React.RefObject<Niivue | null>,
@@ -12,21 +12,11 @@ export function useDrawing(
   const setActiveTab = useFreeBrowseStore((s) => s.setActiveTab);
 
   const syncDrawingOptionsFromNiivue = useCallback(() => {
-    if (nvRef.current && drawingOptions.mode === "wand") {
-      const nv = nvRef.current;
-      if (
-        nv.opts.clickToSegmentPercent !==
-          drawingOptions.magicWandThresholdPercent ||
-        nv.opts.clickToSegmentMaxDistanceMM !==
-          drawingOptions.magicWandMaxDistanceMM
-      ) {
-        setDrawingOptions((prev) => ({
-          ...prev,
-          magicWandThresholdPercent: nv.opts.clickToSegmentPercent,
-          magicWandMaxDistanceMM: nv.opts.clickToSegmentMaxDistanceMM,
-        }));
-      }
-    }
+    // MIGRATION-TODO(P4): re-read magic wand threshold/max-distance from niivue's
+    // clickToSegment* opts once the niivue-mono drawing API exposes them.
+    console.warn(
+      "syncDrawingOptionsFromNiivue: disabled during niivue-mono migration (P4)",
+    );
   }, [
     nvRef,
     drawingOptions.mode,
@@ -36,26 +26,21 @@ export function useDrawing(
   ]);
 
   const handleCreateDrawingLayer = useCallback(() => {
-    if (nvRef.current) {
-      nvRef.current.setDrawingEnabled(false);
-
-      const penValue = drawingOptions.penErases ? 0 : drawingOptions.penValue;
-      nvRef.current.setPenValue(penValue, drawingOptions.penFill);
-      nvRef.current.setDrawOpacity(drawingOptions.opacity);
-
-      setDrawingOptions((prev) => ({ ...prev, enabled: true, mode: "none" }));
-      setActiveTab("drawing");
-    }
+    // MIGRATION-TODO(P4): disable drawing then set pen value/fill/opacity via the
+    // new niivue-mono drawing API before enabling the drawing layer.
+    console.warn(
+      "handleCreateDrawingLayer: disabled during niivue-mono migration (P4)",
+    );
+    setDrawingOptions((prev) => ({ ...prev, enabled: true, mode: "none" }));
+    setActiveTab("drawing");
   }, [nvRef, drawingOptions, setDrawingOptions, setActiveTab]);
 
   const handleDrawingColormapChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
       const newColormap = event.target.value;
       setDrawingOptions((prev) => ({ ...prev, colormap: newColormap }));
-      if (nvRef.current && nvRef.current.drawBitmap) {
-        nvRef.current.setDrawColormap(newColormap);
-        nvRef.current.updateGLVolume();
-      }
+      // MIGRATION-TODO(P4): apply the draw colormap and refresh the GL volume via
+      // the new niivue-mono drawing API.
     },
     [nvRef, setDrawingOptions],
   );
@@ -68,31 +53,11 @@ export function useDrawing(
         mode,
         penErases: mode === "wand" ? false : prev.penErases,
       }));
-      if (nvRef.current) {
-        if (mode === "pen") {
-          const penValue = drawingOptions.penErases
-            ? 0
-            : drawingOptions.penValue;
-          nvRef.current.setPenValue(penValue, drawingOptions.penFill);
-          nvRef.current.setDrawingEnabled(true);
-          nvRef.current.opts.clickToSegment = false;
-        } else if (mode === "wand") {
-          nvRef.current.setDrawingEnabled(true);
-          nvRef.current.opts.clickToSegment = true;
-          nvRef.current.opts.clickToSegmentIs2D =
-            drawingOptions.magicWand2dOnly;
-          nvRef.current.opts.clickToSegmentAutoIntensity = true;
-          nvRef.current.opts.clickToSegmentMaxDistanceMM =
-            drawingOptions.magicWandMaxDistanceMM;
-          nvRef.current.opts.clickToSegmentPercent =
-            drawingOptions.magicWandThresholdPercent;
-          const penValue = drawingOptions.penValue;
-          nvRef.current.setPenValue(penValue, false);
-        } else if (mode === "none") {
-          nvRef.current.setDrawingEnabled(false);
-          nvRef.current.opts.clickToSegment = false;
-        }
-      }
+      // MIGRATION-TODO(P4): wire pen/wand/none modes into the niivue-mono drawing
+      // + clickToSegment API (setDrawingEnabled, setPenValue, opts.clickToSegment*).
+      console.warn(
+        "handleDrawModeChange: disabled during niivue-mono migration (P4)",
+      );
     },
     [nvRef, drawingOptions, setDrawingOptions],
   );
@@ -100,16 +65,8 @@ export function useDrawing(
   const handlePenFillChange = useCallback(
     (checked: boolean) => {
       setDrawingOptions((prev) => ({ ...prev, penFill: checked }));
-      if (nvRef.current) {
-        nvRef.current.drawFillOverwrites = checked;
-        console.log(drawingOptions.mode);
-        if (drawingOptions.mode === "pen") {
-          const penValue = drawingOptions.penErases
-            ? 0
-            : drawingOptions.penValue;
-          nvRef.current.setPenValue(penValue, checked);
-        }
-      }
+      // MIGRATION-TODO(P4): update drawFillOverwrites and pen value (when in pen
+      // mode) via the new niivue-mono drawing API.
     },
     [nvRef, drawingOptions, setDrawingOptions],
   );
@@ -117,14 +74,8 @@ export function useDrawing(
   const handlePenErasesChange = useCallback(
     (checked: boolean) => {
       setDrawingOptions((prev) => ({ ...prev, penErases: checked }));
-      if (nvRef.current) {
-        if (drawingOptions.mode === "pen") {
-          const penValue = checked ? 0 : drawingOptions.penValue;
-          nvRef.current.setPenValue(penValue, drawingOptions.penFill);
-        } else if (drawingOptions.mode === "none") {
-          nvRef.current.setDrawingEnabled(false);
-        }
-      }
+      // MIGRATION-TODO(P4): update pen value / drawing-enabled state via the new
+      // niivue-mono drawing API depending on the active mode.
     },
     [nvRef, drawingOptions, setDrawingOptions],
   );
@@ -133,13 +84,8 @@ export function useDrawing(
     (value: number) => {
       setDrawingOptions((prev) => ({ ...prev, penValue: value }));
       console.log("handlePenValueChange: ", value);
-      if (
-        nvRef.current &&
-        drawingOptions.mode === "pen" &&
-        !drawingOptions.penErases
-      ) {
-        nvRef.current.setPenValue(value, drawingOptions.penFill);
-      }
+      // MIGRATION-TODO(P4): push the pen value to niivue when in pen mode via the
+      // new niivue-mono drawing API.
     },
     [nvRef, drawingOptions, setDrawingOptions],
   );
@@ -147,10 +93,8 @@ export function useDrawing(
   const handleDrawingOpacityChange = useCallback(
     (opacity: number) => {
       setDrawingOptions((prev) => ({ ...prev, opacity }));
-      if (nvRef.current) {
-        nvRef.current.setDrawOpacity(opacity);
-        debouncedGLUpdate();
-      }
+      // MIGRATION-TODO(P4): apply draw opacity via the new niivue-mono drawing API
+      // and trigger debouncedGLUpdate() to refresh the view.
     },
     [nvRef, debouncedGLUpdate, setDrawingOptions],
   );
@@ -158,9 +102,7 @@ export function useDrawing(
   const handleMagicWand2dOnlyChange = useCallback(
     (checked: boolean) => {
       setDrawingOptions((prev) => ({ ...prev, magicWand2dOnly: checked }));
-      if (nvRef.current && drawingOptions.mode === "wand") {
-        nvRef.current.opts.clickToSegmentIs2D = checked;
-      }
+      // MIGRATION-TODO(P4): sync clickToSegmentIs2D via the new niivue-mono API.
     },
     [nvRef, drawingOptions.mode, setDrawingOptions],
   );
@@ -168,9 +110,8 @@ export function useDrawing(
   const handleMagicWandMaxDistanceChange = useCallback(
     (value: number) => {
       setDrawingOptions((prev) => ({ ...prev, magicWandMaxDistanceMM: value }));
-      if (nvRef.current && drawingOptions.mode === "wand") {
-        nvRef.current.opts.clickToSegmentMaxDistanceMM = value;
-      }
+      // MIGRATION-TODO(P4): sync clickToSegmentMaxDistanceMM via the new
+      // niivue-mono API.
     },
     [nvRef, drawingOptions.mode, setDrawingOptions],
   );
@@ -181,63 +122,31 @@ export function useDrawing(
         ...prev,
         magicWandThresholdPercent: value,
       }));
-      if (nvRef.current && drawingOptions.mode === "wand") {
-        nvRef.current.opts.clickToSegmentPercent = value;
-      }
+      // MIGRATION-TODO(P4): sync clickToSegmentPercent via the new niivue-mono API.
     },
     [nvRef, drawingOptions.mode, setDrawingOptions],
   );
 
   const handleDrawUndo = useCallback(() => {
-    if (nvRef.current) {
-      nvRef.current.drawUndo();
-    }
+    // MIGRATION-TODO(P4): call niivue-mono's draw undo once the new drawing API
+    // is available.
+    console.warn("handleDrawUndo: disabled during niivue-mono migration (P4)");
   }, [nvRef]);
 
   const handleSaveDrawing = useCallback(async () => {
-    if (nvRef.current && nvRef.current.drawBitmap) {
-      try {
-        if (nvRef.current.volumes.length === 0) {
-          console.error("No reference volume loaded - cannot save drawing");
-          return;
-        }
-
-        const drawingData = (await nvRef.current.saveImage({
-          filename: "",
-          isSaveDrawing: true,
-          volumeByIndex: 0,
-        })) as Uint8Array;
-
-        const drawingFile = new File([drawingData], drawingOptions.filename, {
-          type: "application/octet-stream",
-        });
-
-        nvRef.current.setDrawingEnabled(false);
-        nvRef.current.setPenValue(0, false);
-        nvRef.current.opts.clickToSegment = false;
-        nvRef.current.closeDrawing();
-
-        const nvimage = await NVImage.loadFromFile({
-          file: drawingFile,
-          name: drawingOptions.filename,
-        });
-
-        nvimage.colormap = "red";
-        nvimage.opacity = 1.0;
-        nvRef.current.addVolume(nvimage);
-
-        setDrawingOptions((prev) => ({
-          ...prev,
-          enabled: false,
-          mode: "none",
-        }));
-
-        setActiveTab("sceneDetails");
-        incrementVolumeVersion();
-      } catch (error) {
-        console.error("Error saving drawing:", error);
-      }
-    }
+    // MIGRATION-TODO(P4): save the drawing bitmap to a file (saveImage), close the
+    // drawing, then reload it as a volume via the new niivue-mono drawing API and
+    // NVImage loader.
+    console.warn(
+      "handleSaveDrawing: disabled during niivue-mono migration (P4)",
+    );
+    setDrawingOptions((prev) => ({
+      ...prev,
+      enabled: false,
+      mode: "none",
+    }));
+    setActiveTab("sceneDetails");
+    incrementVolumeVersion();
   }, [nvRef, drawingOptions, setDrawingOptions, setActiveTab, incrementVolumeVersion]);
 
   return {

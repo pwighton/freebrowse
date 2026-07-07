@@ -13,7 +13,7 @@ import {
   resolveImagingUploadConfirmation,
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
-import { Niivue } from "@niivue/niivue";
+import { NiiVueGPU as Niivue } from "@niivue/niivue";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
 import Sidebar from "./sidebar";
@@ -24,12 +24,12 @@ import ImagingUploadConfirmationDialog from "./dialogs/imaging-upload-confirmati
 import SessionDeleteConfirmationDialog from "./dialogs/session-delete-confirmation-dialog";
 
 const nv = new Niivue({
-  loadingText: "Drag-drop images",
-  dragAndDropEnabled: true,
-  textHeight: 0.02,
-  backColor: [0, 0, 0, 1],
+  // MIGRATION-TODO(P2): tune fontScale (was textHeight=0.02, different units).
+  backend: "webgl2", // pin during migration; auto-select in P6
+  placeholderText: "Drag-drop images",
+  isDragDropEnabled: true,
+  backgroundColor: [0, 0, 0, 1],
   crosshairColor: [1.0, 0.0, 0.0, 0.5],
-  multiplanarForceRender: false,
 });
 
 export default function FreeBrowse() {

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 export function useVolumes(
   nvRef: React.RefObject<Niivue | null>,
@@ -33,18 +33,15 @@ export function useVolumes(
     (id: string) => {
       const nv = nvRef.current;
       if (!nv) return;
-      const volumeIndex = nv.getVolumeIndexByID(id);
+      const volumeIndex = nv.volumes.findIndex((v) => v.id === id);
       if (volumeIndex < 0) return;
 
       const volume = nv.volumes[volumeIndex];
-      const isCurrentlyVisible = volume.opacity > 0;
-      const newOpacity = isCurrentlyVisible ? 0 : (volume.opacity === 0 ? 1.0 : volume.opacity);
+      const opacity = volume.opacity ?? 1.0;
+      const isCurrentlyVisible = opacity > 0;
+      const newOpacity = isCurrentlyVisible ? 0 : (opacity === 0 ? 1.0 : opacity);
 
-      nv.setOpacity(volumeIndex, newOpacity);
-      if (!isCurrentlyVisible) {
-        volume.opacity = newOpacity;
-      }
-      nv.updateGLVolume();
+      void nv.setVolume(volumeIndex, { opacity: newOpacity });
       incrementVolumeVersion();
     },
     [nvRef, incrementVolumeVersion],
@@ -54,8 +51,7 @@ export function useVolumes(
     (newOpacity: number) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      nv.setOpacity(currentImageIndex, newOpacity);
-      debouncedGLUpdate();
+      void nv.setVolume(currentImageIndex, { opacity: newOpacity });
       incrementVolumeVersion();
     },
     [currentImageIndex, nvRef, debouncedGLUpdate, incrementVolumeVersion],
@@ -65,7 +61,9 @@ export function useVolumes(
     (newFrame: number) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      nv.setFrame4D(nv.volumes[currentImageIndex].id, newFrame);
+      const id = nv.volumes[currentImageIndex].id;
+      if (!id) return;
+      void nv.setFrame4D(id, newFrame);
       incrementVolumeVersion();
     },
     [currentImageIndex, nvRef, incrementVolumeVersion],
@@ -75,7 +73,7 @@ export function useVolumes(
     (newContrastMin: number) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      nv.volumes[currentImageIndex].cal_min = newContrastMin;
+      nv.volumes[currentImageIndex].calMin = newContrastMin;
       debouncedGLUpdate();
       incrementVolumeVersion();
     },
@@ -86,7 +84,7 @@ export function useVolumes(
     (newContrastMax: number) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      nv.volumes[currentImageIndex].cal_max = newContrastMax;
+      nv.volumes[currentImageIndex].calMax = newContrastMax;
       debouncedGLUpdate();
       incrementVolumeVersion();
     },
@@ -97,10 +95,10 @@ export function useVolumes(
     (checked: boolean) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      const volume = nv.volumes[currentImageIndex];
-      if (!volume.hdr) return;
-      volume.hdr.intent_code = checked ? 1002 : 0;
-      nv.updateGLVolume();
+      // MIGRATION-TODO(P3): the old intent_code=1002 toggle is replaced by
+      // nv.setColormapLabel(index, cmap|null) + makeLabelLut. Stubbed until
+      // meshes/labels phase.
+      void checked;
       incrementVolumeVersion();
     },
     [currentImageIndex, nvRef, incrementVolumeVersion],
@@ -126,7 +124,7 @@ export function useVolumes(
     if (currentImageIndex === 0) return; // already first in the list
     // UI "up" means earlier in the list (lower index); niivue's moveVolumeDown
     // decreases the array index.
-    nv.moveVolumeDown(nv.volumes[currentImageIndex]);
+    void nv.moveVolumeDown(currentImageIndex);
     setCurrentImageIndex(currentImageIndex - 1); // keep selection on moved volume
     incrementVolumeVersion();
   }, [currentImageIndex, nvRef, setCurrentImageIndex, incrementVolumeVersion]);
@@ -137,7 +135,7 @@ export function useVolumes(
     if (currentImageIndex >= nv.volumes.length - 1) return; // already last in the list
     // UI "down" means later in the list (higher index); niivue's moveVolumeUp
     // increases the array index.
-    nv.moveVolumeUp(nv.volumes[currentImageIndex]);
+    void nv.moveVolumeUp(currentImageIndex);
     setCurrentImageIndex(currentImageIndex + 1); // keep selection on moved volume
     incrementVolumeVersion();
   }, [currentImageIndex, nvRef, setCurrentImageIndex, incrementVolumeVersion]);
@@ -146,7 +144,7 @@ export function useVolumes(
     (imageIndex: number) => {
       const nv = nvRef.current;
       if (!nv || !nv.volumes[imageIndex]) return;
-      nv.removeVolumeByIndex(imageIndex);
+      void nv.removeVolume(imageIndex);
       incrementVolumeVersion();
 
       if (currentImageIndex === imageIndex) {
@@ -181,70 +179,16 @@ export function useVolumes(
 
   const handleEditVolume = useCallback(
     async (imageIndex: number) => {
-      const nv = nvRef.current;
-      if (!nv || !nv.volumes[imageIndex]) return;
-
-      const volumeIndex = imageIndex;
-
-      try {
-        const volumeData = (await nv.saveImage({
-          filename: "",
-          isSaveDrawing: false,
-          volumeByIndex: volumeIndex,
-        })) as Uint8Array;
-
-        const volumeName = nv.volumes[imageIndex].name || `Volume ${imageIndex + 1}`;
-        const drawingImage = await nv.niftiArray2NVImage(volumeData);
-
-        nv.removeVolumeByIndex(volumeIndex);
-        incrementVolumeVersion();
-
-        if (nv.volumes.length > 0 && !nv.back) {
-          console.log("Setting background to first remaining volume");
-          nv.setVolume(nv.volumes[0], 0);
-        }
-
-        if (currentImageIndex === imageIndex) {
-          if (imageIndex > 0) {
-            setCurrentImageIndex(imageIndex - 1);
-          } else if (nv.volumes.length > 0) {
-            setCurrentImageIndex(0);
-          } else {
-            setCurrentImageIndex(null);
-          }
-        } else if (
-          currentImageIndex !== null &&
-          currentImageIndex > imageIndex
-        ) {
-          setCurrentImageIndex(currentImageIndex - 1);
-        }
-
-        const loadSuccess = nv.loadDrawing(drawingImage);
-        if (!loadSuccess) {
-          console.error(
-            "Failed to load drawing - dimensions may be incompatible",
-          );
-        }
-
-        setDrawingOptions((prev) => ({
-          ...prev,
-          enabled: true,
-          mode: "none",
-          filename: volumeName.endsWith(".nii.gz")
-            ? volumeName
-            : `${volumeName}.nii.gz`,
-        }));
-
-        nv.setDrawingEnabled(false);
-        nv.setPenValue(drawingOptions.penValue, drawingOptions.penFill);
-        nv.drawFillOverwrites = drawingOptions.penFill;
-
-        setActiveTab("drawing");
-      } catch (error) {
-        console.error("Error converting volume to drawing:", error);
-      }
+      // MIGRATION-TODO(P4): "edit volume as drawing" depends on the drawing
+      // subsystem (saveVolume -> File -> loadDrawing, uint8 handling) migrated
+      // in the drawing phase. Stubbed and hidden in the UI until then.
+      void imageIndex;
+      void drawingOptions;
+      void setDrawingOptions;
+      void setActiveTab;
+      console.warn("handleEditVolume: disabled during niivue-mono migration (P4)");
     },
-    [currentImageIndex, drawingOptions, nvRef, incrementVolumeVersion, setCurrentImageIndex, setDrawingOptions, setActiveTab],
+    [drawingOptions, setDrawingOptions, setActiveTab],
   );
 
   const canEditVolume = useCallback(
@@ -253,7 +197,7 @@ export function useVolumes(
       if (!nv || !nv.volumes[imageIndex]) return false;
 
       const volume = nv.volumes[imageIndex];
-      const background = nv.back;
+      const background = nv.volumes[0];
 
       if (!background) return false;
       if (volume === background) return false;

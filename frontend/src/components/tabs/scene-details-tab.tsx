@@ -20,7 +20,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { deploymentConfig } from "@/lib/deployment-config";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
 interface SceneDetailsTabProps {
   nvRef: React.RefObject<Niivue | null>;
@@ -295,7 +295,7 @@ export default function SceneDetailsTab({
                   value={currentVolume.colormap || "gray"}
                   onChange={onColormapChange}
                 >
-                  {nvRef.current?.colormaps().map((colormap: string) => (
+                  {nvRef.current?.colormaps.map((colormap: string) => (
                     <option key={colormap} value={colormap}>
                       {colormap}
                     </option>

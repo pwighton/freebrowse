@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { NVDocument, NVImage, type Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 
 export function useFileLoading(
@@ -28,101 +28,16 @@ export function useFileLoading(
   // Helper function to load NVD data
   const loadNvdData = useCallback(
     async (jsonData: any) => {
-      if (!nvRef.current) return;
-      const nv = nvRef.current;
-
-      setCurrentImageIndex(null);
-
-      console.log("loadNvdData() -- jsonData: ", jsonData);
-
-      const document = await NVDocument.loadFromJSON(jsonData);
-      await document.fetchLinkedData();
-      console.log("loadNvdData() document: ", document);
-
-      try {
-        await nv.loadDocument(document);
-
-        if (
-          jsonData.encodedImageBlobs &&
-          jsonData.encodedImageBlobs.length > 0
-        ) {
-          console.log(
-            "Loading encoded image blobs:",
-            jsonData.encodedImageBlobs.length,
-          );
-          for (let i = 0; i < jsonData.encodedImageBlobs.length; i++) {
-            const blob = jsonData.encodedImageBlobs[i];
-            if (blob) {
-              try {
-                const imageOptions = jsonData.imageOptionsArray?.[i] || {};
-                const nvimage = await NVImage.loadFromBase64({
-                  base64: blob,
-                  ...imageOptions,
-                });
-                nv.addVolume(nvimage);
-                console.log(
-                  `Loaded encoded image blob ${i + 1}/${jsonData.encodedImageBlobs.length}`,
-                );
-              } catch (error) {
-                console.error(`Failed to load encoded image blob ${i}:`, error);
-              }
-            }
-          }
-        }
-
-        syncViewerOptionsFromNiivue();
-      } catch (error) {
-        console.error("nv.loadDocument failed:", error);
-        console.log("Current nv.volumes:", nv.volumes);
-        console.log("Current nv.meshes:", nv.meshes);
-        console.log("Current nv.drawBitmap:", nv.drawBitmap);
-        throw error;
-      }
-
-      if (jsonData.imageOptionsArray && nv.volumes) {
-        for (
-          let i = 0;
-          i < nv.volumes.length && i < jsonData.imageOptionsArray.length;
-          i++
-        ) {
-          const imageOption = jsonData.imageOptionsArray[i];
-          if (imageOption.url) {
-            nv.volumes[i].url = imageOption.url;
-          }
-        }
-      }
-
-      if (jsonData.meshes && jsonData.meshes.length > 0) {
-        console.log("Loading meshes:", jsonData.meshes);
-        await nv.loadMeshes(jsonData.meshes);
-
-        // WORKAROUND: NiiVue's loadLayer doesn't persist layer names on the
-        // layer objects it creates. Backfill from the original JSON URLs.
-        // Remove after niivue PR that adds `newLayer.name = layerName` is merged.
-        for (const meshJson of jsonData.meshes) {
-          if (!meshJson.layers || meshJson.layers.length === 0) continue;
-
-          // Match the loaded mesh by name (extracted from URL basename)
-          const meshName = meshJson.name || meshJson.url?.split("/").pop() || "";
-          const mesh = nv.meshes.find((m: any) => m.name === meshName);
-          if (!mesh?.layers) continue;
-
-          for (let li = 0; li < mesh.layers.length && li < meshJson.layers.length; li++) {
-            const layerJson = meshJson.layers[li];
-            const layerName = layerJson.name || layerJson.url?.split("/").pop() || "";
-            if (layerName && !mesh.layers[li].name) {
-              mesh.layers[li].name = layerName;
-            }
-          }
-        }
-      }
-
-      setCurrentImageIndex(0);
-      incrementVolumeVersion();
-      updateSurfaceDetails();
-      nv.setCrosshairColor([0, 1, 0, 0.1]);
+      // MIGRATION-TODO(P5): document load is rebuilt in the documents phase
+      // around a JSON<->CBOR adapter (nvd-json.ts) + nv.loadDocument(File).
+      // The old-schema path (NVDocument.loadFromJSON, encodedImageBlobs,
+      // meshesString, layer-name backfill) is retired. Disabled until then.
+      void jsonData;
+      void syncViewerOptionsFromNiivue;
+      void updateSurfaceDetails;
+      console.warn("loadNvdData: document loading disabled during niivue-mono migration (P5)");
     },
-    [nvRef, setCurrentImageIndex, syncViewerOptionsFromNiivue, incrementVolumeVersion, updateSurfaceDetails],
+    [syncViewerOptionsFromNiivue, updateSurfaceDetails],
   );
 
   // Add uploaded files to Niivue
@@ -166,12 +81,9 @@ export function useFileLoading(
         }
       } else {
         const promises = files.map(async (file) => {
-          const nvimage = await NVImage.loadFromFile({
-            file: file,
-          });
-          console.log("nv", nv);
-          nv.addVolume(nvimage);
-          return nvimage;
+          // niivue-mono: addVolume accepts a File directly (url: string | File);
+          // the separate NVImage.loadFromFile step is gone.
+          await nv.addVolume({ url: file, name: file.name });
         });
 
         await Promise.all(promises);
@@ -217,7 +129,7 @@ export function useFileLoading(
         };
 
         console.log("Adding imaging file to scene:", volume);
-        await nv.addVolumeFromUrl(volume);
+        await nv.addVolume(volume);
 
         applyViewerOptions();
         incrementVolumeVersion();
@@ -309,19 +221,12 @@ export function useFileLoading(
           return;
         }
 
-        const meshOptionsList = files.map((file) => ({
-          url: URL.createObjectURL(file),
-          name: file.name,
-          rgba255: [255, 255, 0, 255] as [number, number, number, number],
-          meshShaderIndex: 14,
-        }));
-
-        try {
-          await nv.addMeshesFromUrl(meshOptionsList);
-          nv.updateGLVolume();
-        } catch (error) {
-          console.error("Error loading surface files:", error);
-        }
+        // MIGRATION-TODO(P3): surface loading moves to
+        // nv.loadMeshes([{ url: File, name, color, shaderType }]) — File is
+        // accepted directly (no blob URL), rgba255 -> color, meshShaderIndex ->
+        // shaderType name. Disabled until the meshes phase.
+        void files;
+        console.warn("handleSurfaceFileChange: surface loading disabled during niivue-mono migration (P3)");
 
         updateSurfaceDetails();
 
@@ -334,24 +239,35 @@ export function useFileLoading(
     [nvRef, showUploader, currentSurfaceIndex, updateSurfaceDetails, setShowUploader, setCurrentSurfaceIndex],
   );
 
-  // Set up Niivue callbacks
+  // Set up Niivue event listeners (niivue-mono uses the EventTarget API rather
+  // than assignable onXxx callback props).
   useEffect(() => {
-    if (nvRef.current) {
-      nvRef.current.onDragRelease = async () => {
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        incrementVolumeVersion();
-      };
+    const nv = nvRef.current;
+    if (!nv) return;
 
-      nvRef.current.onLocationChange = handleLocationChange;
-      nvRef.current.onOptsChange = syncDrawingOptionsFromNiivue;
-    }
+    const onDragRelease = () => {
+      requestAnimationFrame(() => incrementVolumeVersion());
+    };
+    const onLocationChange = (e: Event) =>
+      handleLocationChange((e as CustomEvent).detail);
+
+    nv.addEventListener("dragRelease", onDragRelease);
+    nv.addEventListener("locationChange", onLocationChange);
+    // MIGRATION-TODO(P4): the old onOptsChange sync only existed to track the
+    // click-to-segment wand threshold; that opt is gone from core niivue.
+    void syncDrawingOptionsFromNiivue;
+
+    return () => {
+      nv.removeEventListener("dragRelease", onDragRelease);
+      nv.removeEventListener("locationChange", onLocationChange);
+    };
   }, [nvRef, handleLocationChange, syncDrawingOptionsFromNiivue, incrementVolumeVersion]);
 
   // Enable/disable drag-and-drop based on whether volumes are loaded
   useEffect(() => {
     void volumeVersion;
     if (nvRef.current) {
-      nvRef.current.opts.dragAndDropEnabled =
+      nvRef.current.isDragDropEnabled =
         showUploader && (nvRef.current.volumes?.length ?? 0) === 0;
     }
   }, [nvRef, volumeVersion, showUploader]);

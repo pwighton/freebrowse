@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { NVMesh, type Niivue } from "@niivue/niivue";
+import { type NiiVueGPU as Niivue } from "@niivue/niivue";
 
 export function useMeshLayers(
   nvRef: React.RefObject<Niivue | null>,
@@ -25,52 +25,19 @@ export function useMeshLayers(
     if (!nv || currentSurfaceIndex === null || !nv.meshes[currentSurfaceIndex]) {
       return [];
     }
+    // MIGRATION-TODO(P3): restore the layer-name backfill workaround (name/url
+    // properties) once mesh layers are reimplemented against niivue-mono.
     const layers = nv.meshes[currentSurfaceIndex].layers || [];
-    // WORKAROUND: NiiVue's loadLayer doesn't persist the name on the layer
-    // object. Backfill from the URL if available (covers layers loaded via
-    // meshesString/loadDocument path). Remove after niivue PR is merged.
-    for (const layer of layers) {
-      if (!layer.name && layer.url) {
-        try {
-          const pathname = new URL(layer.url).pathname;
-          layer.name = pathname.split("/").pop() || layer.url;
-        } catch {
-          layer.name = layer.url.split("/").pop() || layer.url;
-        }
-      }
-    }
     return layers;
   }, [nvRef, currentSurfaceIndex, layerVersion]);
 
   const addLayerFromFile = useCallback(
     async (file: File) => {
-      const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || !nv.meshes[currentSurfaceIndex]) {
-        return;
-      }
-      const mesh = nv.meshes[currentSurfaceIndex];
-      const blobUrl = URL.createObjectURL(file);
-
-      try {
-        await NVMesh.loadLayer(
-          { url: blobUrl, name: file.name, opacity: 0.5, colormap: "warm" } as any,
-          mesh,
-        );
-        // WORKAROUND: NiiVue's loadLayer doesn't set name on the layer object.
-        // Remove after niivue PR is merged.
-        const newLayer = mesh.layers[mesh.layers.length - 1];
-        if (newLayer) {
-          newLayer.name = file.name;
-        }
-        mesh.updateMesh(nv.gl);
-        nv.updateGLVolume();
-        incrementLayerVersion();
-        setSelectedLayerIndex(mesh.layers.length - 1);
-      } catch (error) {
-        console.error("Error loading layer file:", error);
-      } finally {
-        URL.revokeObjectURL(blobUrl);
-      }
+      // MIGRATION-TODO(P3): reimplement layer loading against niivue-mono
+      // (was NVMesh.loadLayer + layer-name backfill + mesh.updateMesh(nv.gl)),
+      // then incrementLayerVersion + setSelectedLayerIndex on success.
+      console.warn("addLayerFromFile: disabled during niivue-mono migration (P3)");
+      void file;
     },
     [nvRef, currentSurfaceIndex, incrementLayerVersion, setSelectedLayerIndex],
   );
@@ -83,8 +50,9 @@ export function useMeshLayers(
       }
       const mesh = nv.meshes[currentSurfaceIndex];
       mesh.layers.splice(layerIndex, 1);
-      mesh.updateMesh(nv.gl);
-      nv.updateGLVolume();
+      // MIGRATION-TODO(P3): re-upload mesh to GPU after layer removal
+      // (was mesh.updateMesh(nv.gl) + nv.updateGLVolume()).
+      console.warn("removeLayer: GPU refresh disabled during niivue-mono migration (P3)");
       incrementLayerVersion();
 
       // Adjust selection
@@ -99,62 +67,50 @@ export function useMeshLayers(
 
   const handleLayerOpacityChange = useCallback(
     (value: number) => {
-      const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || selectedLayerIndex === null) return;
-      const mesh = nv.meshes[currentSurfaceIndex];
-      if (!mesh) return;
-      nv.setMeshLayerProperty(mesh.id, selectedLayerIndex, "opacity", value);
-      incrementLayerVersion();
+      // MIGRATION-TODO(P3): apply layer opacity via the new setMeshLayerProperty
+      // signature (was nv.setMeshLayerProperty(mesh.id, layerIndex, "opacity", value)).
+      console.warn("handleLayerOpacityChange: disabled during niivue-mono migration (P3)");
+      void value;
     },
     [nvRef, currentSurfaceIndex, selectedLayerIndex, incrementLayerVersion],
   );
 
   const handleLayerCalMinChange = useCallback(
     (value: number) => {
-      const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || selectedLayerIndex === null) return;
-      const mesh = nv.meshes[currentSurfaceIndex];
-      if (!mesh) return;
-      nv.setMeshLayerProperty(mesh.id, selectedLayerIndex, "cal_min", value);
-      incrementLayerVersion();
+      // MIGRATION-TODO(P3): apply layer cal_min via the new setMeshLayerProperty
+      // signature (was nv.setMeshLayerProperty(mesh.id, layerIndex, "cal_min", value)).
+      console.warn("handleLayerCalMinChange: disabled during niivue-mono migration (P3)");
+      void value;
     },
     [nvRef, currentSurfaceIndex, selectedLayerIndex, incrementLayerVersion],
   );
 
   const handleLayerCalMaxChange = useCallback(
     (value: number) => {
-      const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || selectedLayerIndex === null) return;
-      const mesh = nv.meshes[currentSurfaceIndex];
-      if (!mesh) return;
-      nv.setMeshLayerProperty(mesh.id, selectedLayerIndex, "cal_max", value);
-      incrementLayerVersion();
+      // MIGRATION-TODO(P3): apply layer cal_max via the new setMeshLayerProperty
+      // signature (was nv.setMeshLayerProperty(mesh.id, layerIndex, "cal_max", value)).
+      console.warn("handleLayerCalMaxChange: disabled during niivue-mono migration (P3)");
+      void value;
     },
     [nvRef, currentSurfaceIndex, selectedLayerIndex, incrementLayerVersion],
   );
 
   const handleLayerColormapChange = useCallback(
     async (colormap: string) => {
-      const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || selectedLayerIndex === null) return;
-      const mesh = nv.meshes[currentSurfaceIndex];
-      if (!mesh) return;
-      await mesh.setLayerProperty(selectedLayerIndex, "colormap", colormap, nv.gl);
-      nv.updateGLVolume();
-      incrementLayerVersion();
+      // MIGRATION-TODO(P3): apply layer colormap via the new mesh layer API
+      // (was mesh.setLayerProperty(layerIndex, "colormap", value, nv.gl) + nv.updateGLVolume()).
+      console.warn("handleLayerColormapChange: disabled during niivue-mono migration (P3)");
+      void colormap;
     },
     [nvRef, currentSurfaceIndex, selectedLayerIndex, incrementLayerVersion],
   );
 
   const handleLayerUseNegativeCmapChange = useCallback(
     async (checked: boolean) => {
-      const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || selectedLayerIndex === null) return;
-      const mesh = nv.meshes[currentSurfaceIndex];
-      if (!mesh) return;
-      await mesh.setLayerProperty(selectedLayerIndex, "useNegativeCmap", checked, nv.gl);
-      nv.updateGLVolume();
-      incrementLayerVersion();
+      // MIGRATION-TODO(P3): apply layer useNegativeCmap via the new mesh layer API
+      // (was mesh.setLayerProperty(layerIndex, "useNegativeCmap", value, nv.gl) + nv.updateGLVolume()).
+      console.warn("handleLayerUseNegativeCmapChange: disabled during niivue-mono migration (P3)");
+      void checked;
     },
     [nvRef, currentSurfaceIndex, selectedLayerIndex, incrementLayerVersion],
   );

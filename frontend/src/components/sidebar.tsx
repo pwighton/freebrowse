@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import type { Niivue } from "@niivue/niivue";
+import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 import NvdTab from "@/components/tabs/nvd-tab";
 import DataTab from "@/components/tabs/data-tab";
