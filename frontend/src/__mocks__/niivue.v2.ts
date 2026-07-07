@@ -1,0 +1,354 @@
+/**
+ * niivue-mono (`@niivue/niivue` 1.0.0-rc.*) test double — v2, side-by-side.
+ *
+ * Models the new `NiiVueGPU` controller: an `EventTarget` whose flat setters and
+ * mutating methods dispatch the same `CustomEvent`s the real controller emits
+ * (`change`, `volumeUpdated`, `meshUpdated`, `volumeRemoved`, `drawingChanged`,
+ * ...). This is what makes `registerNiivueEvents` testable without a GPU.
+ *
+ * NOT yet wired into `vi.mock("@niivue/niivue")` — the app still uses the legacy
+ * `./niivue.ts` mock until Phase 2. `niivue-sync` tests import this directly.
+ */
+
+export const SLICE_TYPE = {
+  AXIAL: 0,
+  CORONAL: 1,
+  SAGITTAL: 2,
+  MULTIPLANAR: 3,
+  RENDER: 4,
+  NONE: 5,
+} as const;
+
+export const DRAG_MODE = {
+  none: 0,
+  contrast: 1,
+  measurement: 2,
+  pan: 3,
+  slicer3D: 4,
+  callbackOnly: 5,
+  roiSelection: 6,
+  angle: 7,
+  crosshair: 8,
+  windowing: 9,
+} as const;
+
+export const SHOW_RENDER = {
+  NEVER: 0,
+  ALWAYS: 1,
+  AUTO: 2,
+} as const;
+
+type MockVolume = Record<string, unknown> & { id?: string; url?: string };
+type MockMesh = Record<string, unknown> & { id?: string; url?: string };
+
+/** Flat scalar properties: every set emits a generic `change {property, value}`. */
+const CHANGE_PROPS = [
+  "showRender",
+  "isColorbarVisible",
+  "isRadiological",
+  "crosshairColor",
+  "crosshairWidth",
+  "crosshairGap",
+  "rulerWidth",
+  "isRulerVisible",
+  "volumeIsNearestInterpolation",
+  "volumeOutlineWidth",
+  "secondaryDragMode",
+  "scaleMultiplier",
+  "isDragDropEnabled",
+  "drawOpacity",
+  "drawColormap",
+  "drawIsFillOverwriting",
+] as const;
+
+export class NiiVueGPU extends EventTarget {
+  volumes: MockVolume[] = [];
+  meshes: MockMesh[] = [];
+  drawingVolume: unknown = null;
+  canvas: HTMLCanvasElement | null = null;
+  model: { removeVolume: (index: number) => void };
+
+  // Declared (not initialized) so TS sees them; defined via Object.defineProperty
+  // in the constructor so each assignment emits a `change` event.
+  declare showRender: number;
+  declare isColorbarVisible: boolean;
+  declare isRadiological: boolean;
+  declare crosshairColor: [number, number, number, number];
+  declare crosshairWidth: number;
+  declare crosshairGap: number;
+  declare rulerWidth: number;
+  declare isRulerVisible: boolean;
+  declare volumeIsNearestInterpolation: boolean;
+  declare volumeOutlineWidth: number;
+  declare secondaryDragMode: number;
+  declare scaleMultiplier: number;
+  declare isDragDropEnabled: boolean;
+  declare drawOpacity: number;
+  declare drawColormap: string;
+  declare drawIsFillOverwriting: boolean;
+
+  private _props: Record<string, unknown> = {};
+
+  constructor(opts?: Record<string, unknown>) {
+    super();
+    void opts;
+    // Define generic change-emitting scalar properties.
+    for (const prop of CHANGE_PROPS) {
+      Object.defineProperty(this, prop, {
+        enumerable: true,
+        get: () => this._props[prop],
+        set: (value: unknown) => {
+          this._props[prop] = value;
+          this.emit("change", { property: prop, value });
+        },
+      });
+    }
+    // model.removeVolume mirrors the (currently) controller-less removal path.
+    this.model = {
+      removeVolume: (index: number) => {
+        this.volumes.splice(index, 1);
+      },
+    };
+  }
+
+  /** Dispatch a CustomEvent — also used by tests to simulate interaction events. */
+  emit(name: string, detail?: unknown): void {
+    this.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+
+  // --- properties with a specific event in addition to `change` ---
+  get sliceType(): number {
+    return (this._props.sliceType as number) ?? SLICE_TYPE.MULTIPLANAR;
+  }
+  set sliceType(value: number) {
+    this._props.sliceType = value;
+    this.emit("change", { property: "sliceType", value });
+    this.emit("sliceTypeChange", { sliceType: value });
+  }
+
+  get azimuth(): number {
+    return (this._props.azimuth as number) ?? 0;
+  }
+  set azimuth(value: number) {
+    this._props.azimuth = value;
+    this.emit("change", { property: "azimuth", value });
+    this.emit("azimuthElevationChange", {
+      azimuth: value,
+      elevation: this.elevation,
+    });
+  }
+
+  get elevation(): number {
+    return (this._props.elevation as number) ?? 0;
+  }
+  set elevation(value: number) {
+    this._props.elevation = value;
+    this.emit("change", { property: "elevation", value });
+    this.emit("azimuthElevationChange", {
+      azimuth: this.azimuth,
+      elevation: value,
+    });
+  }
+
+  get drawIsEnabled(): boolean {
+    return (this._props.drawIsEnabled as boolean) ?? false;
+  }
+  set drawIsEnabled(value: boolean) {
+    this._props.drawIsEnabled = value;
+    this.emit("change", { property: "drawIsEnabled", value });
+    this.emit("drawingEnabled", { isEnabled: value });
+  }
+
+  get drawPenValue(): number {
+    return (this._props.drawPenValue as number) ?? 1;
+  }
+  set drawPenValue(value: number) {
+    this._props.drawPenValue = value;
+    this.emit("change", { property: "drawPenValue", value });
+    this.emit("penValueChanged", { penValue: value });
+  }
+
+  // --- lifecycle ---
+  async attachToCanvas(canvas: HTMLCanvasElement): Promise<this> {
+    this.canvas = canvas;
+    this.emit("viewAttached", { canvas, backend: "webgl2" });
+    return this;
+  }
+
+  async updateGLVolume(): Promise<void> {}
+  drawScene(): void {}
+
+  // --- volumes ---
+  async addVolume(opts: { url?: string; name?: string }): Promise<void> {
+    const volume: MockVolume = {
+      id: `vol-${this.volumes.length}`,
+      url: opts.url,
+      name: opts.name ?? opts.url,
+    };
+    this.volumes.push(volume);
+    this.emit("volumeLoaded", { volume });
+  }
+
+  async loadVolumes(list: { url?: string; name?: string }[]): Promise<void> {
+    for (const opts of list) await this.addVolume(opts);
+  }
+
+  removeVolume(index: number): void {
+    const [volume] = this.volumes.splice(index, 1);
+    this.emit("volumeRemoved", { volume, index });
+  }
+
+  async setVolume(
+    index: number,
+    changes: Record<string, unknown>,
+  ): Promise<void> {
+    const volume = this.volumes[index];
+    if (!volume) return;
+    Object.assign(volume, changes);
+    this.emit("volumeUpdated", { volumeIndex: index, volume, changes });
+  }
+
+  async setFrame4D(id: string, frame: number): Promise<void> {
+    const volume = this.volumes.find((v) => v.id === id);
+    if (!volume) return;
+    volume.frame4D = frame;
+    this.emit("frameChange", { volume, frame });
+  }
+
+  async setColormapLabel(index: number, cmap: unknown): Promise<void> {
+    const volume = this.volumes[index];
+    if (!volume) return;
+    volume.colormapLabel = cmap;
+    this.emit("volumeUpdated", {
+      volumeIndex: index,
+      volume,
+      changes: { colormapLabel: cmap },
+    });
+  }
+
+  private emitOrder(): void {
+    this.emit("volumeOrderChanged", { volumes: this.volumes });
+  }
+  async moveVolumeUp(index: number): Promise<void> {
+    if (index <= 0) return;
+    const [v] = this.volumes.splice(index, 1);
+    this.volumes.splice(index - 1, 0, v);
+    this.emitOrder();
+  }
+  async moveVolumeToTop(index: number): Promise<void> {
+    const [v] = this.volumes.splice(index, 1);
+    this.volumes.unshift(v);
+    this.emitOrder();
+  }
+
+  // --- meshes & layers ---
+  async loadMeshes(list: Record<string, unknown>[]): Promise<void> {
+    for (const opts of list) await this.addMesh(opts);
+  }
+
+  async addMesh(opts: Record<string, unknown>): Promise<void> {
+    const mesh: MockMesh = { id: `mesh-${this.meshes.length}`, ...opts };
+    if (!mesh.layers) mesh.layers = [];
+    this.meshes.push(mesh);
+    this.emit("meshLoaded", { mesh });
+  }
+
+  removeMesh(index: number): void {
+    const [mesh] = this.meshes.splice(index, 1);
+    this.emit("meshRemoved", { mesh, index });
+  }
+
+  async setMesh(
+    index: number,
+    changes: Record<string, unknown>,
+  ): Promise<void> {
+    const mesh = this.meshes[index];
+    if (!mesh) return;
+    Object.assign(mesh, changes);
+    this.emit("meshUpdated", { meshIndex: index, mesh, changes });
+  }
+
+  // Layer ops emit meshUpdated (per the planned event-coverage PR).
+  async addMeshLayer(
+    index: number,
+    layer: Record<string, unknown>,
+  ): Promise<void> {
+    const mesh = this.meshes[index];
+    if (!mesh) return;
+    const layers = (mesh.layers as Record<string, unknown>[]) ?? [];
+    layers.push(layer);
+    mesh.layers = layers;
+    this.emit("meshUpdated", {
+      meshIndex: index,
+      mesh,
+      changes: { layers },
+    });
+  }
+
+  async removeMeshLayer(index: number, layerIndex: number): Promise<void> {
+    const mesh = this.meshes[index];
+    if (!mesh) return;
+    const layers = (mesh.layers as Record<string, unknown>[]) ?? [];
+    layers.splice(layerIndex, 1);
+    this.emit("meshUpdated", { meshIndex: index, mesh, changes: { layers } });
+  }
+
+  async setMeshLayerProperty(
+    index: number,
+    layerIndex: number,
+    changes: Record<string, unknown>,
+  ): Promise<void> {
+    const mesh = this.meshes[index];
+    if (!mesh) return;
+    const layers = (mesh.layers as Record<string, unknown>[]) ?? [];
+    if (layers[layerIndex]) Object.assign(layers[layerIndex], changes);
+    this.emit("meshUpdated", { meshIndex: index, mesh, changes: { layers } });
+  }
+
+  // --- drawing ---
+  createEmptyDrawing(): void {
+    this.drawingVolume = { id: "drawing" };
+    this.emit("drawingChanged", { action: "create" });
+  }
+  closeDrawing(): void {
+    this.drawingVolume = null;
+    this.emit("drawingChanged", { action: "close" });
+  }
+  drawUndo(): void {
+    this.emit("drawingChanged", { action: "undo" });
+  }
+  async loadDrawing(source: unknown): Promise<boolean> {
+    void source;
+    this.drawingVolume = { id: "drawing" };
+    // Extended action from the planned event-coverage PR.
+    this.emit("drawingChanged", { action: "load" });
+    return true;
+  }
+
+  // --- documents & colormaps ---
+  async loadDocument(source: unknown): Promise<void> {
+    void source;
+    this.emit("documentLoaded");
+  }
+  serializeDocument(): Uint8Array {
+    return new Uint8Array();
+  }
+  addColormap(name: string, cmap: unknown): string {
+    void cmap;
+    this.emit("colormapAdded", { name });
+    return name;
+  }
+
+  get colormaps(): string[] {
+    return ["gray", "hot", "cool", "winter"];
+  }
+  get meshShaders(): string[] {
+    return ["phong", "matcap", "outline"];
+  }
+}
+
+export default NiiVueGPU;
+
+// Minimal placeholder types the app imports as values in the new API.
+export class NVImage {}
+export class NVMesh {}
