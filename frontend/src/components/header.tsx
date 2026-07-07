@@ -31,8 +31,8 @@ export default function Header({ nvRef }: HeaderProps) {
 
   const {
     viewerOptions,
-    setViewerOptions,
     handleViewMode,
+    handleDragModeChange,
     resetViewAndContrast,
   } = useViewerOptions(nvRef);
 
@@ -56,9 +56,7 @@ export default function Header({ nvRef }: HeaderProps) {
               <span className="text-sm font-medium">Right drag:</span>
               <DragModeSelector
                 currentMode={viewerOptions.dragMode}
-                onModeChange={(mode) =>
-                  setViewerOptions((prev) => ({ ...prev, dragMode: mode }))
-                }
+                onModeChange={handleDragModeChange}
                 availableModes={["contrast", "pan"]}
               />
             </div>

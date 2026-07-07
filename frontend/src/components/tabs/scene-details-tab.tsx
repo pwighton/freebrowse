@@ -271,19 +271,19 @@ export default function SceneDetailsTab({
               />
               <LabeledSliderWithInput
                 label="Contrast Min"
-                value={currentVolume.cal_min ?? 0}
+                value={currentVolume.calMin ?? 0}
                 onValueChange={onContrastMinChange}
-                min={currentVolume.global_min ?? 0}
-                max={currentVolume.global_max ?? 255}
+                min={currentVolume.globalMin ?? 0}
+                max={currentVolume.globalMax ?? 255}
                 step={0.1}
                 decimalPlaces={1}
               />
               <LabeledSliderWithInput
                 label="Contrast Max"
-                value={currentVolume.cal_max ?? 100}
+                value={currentVolume.calMax ?? 100}
                 onValueChange={onContrastMaxChange}
-                min={currentVolume.global_min ?? 0}
-                max={currentVolume.global_max ?? 255}
+                min={currentVolume.globalMin ?? 0}
+                max={currentVolume.globalMax ?? 255}
                 step={0.1}
                 decimalPlaces={1}
               />

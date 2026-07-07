@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
 import { sliceTypeMap } from "@/lib/niivue-helpers";
 import { DRAG_MODE, type NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { DragMode } from "@/components/drag-mode-selector";
 import type { ViewMode } from "@/store/types";
 
 /**
@@ -84,6 +85,15 @@ export function useViewerOptions(
       if (!nv || !cfg) return;
       nv.showRender = cfg.showRender;
       nv.sliceType = cfg.sliceType;
+    },
+    [nvRef],
+  );
+
+  // "Right drag" mode -> niivue's secondaryDragMode. Store follows via the
+  // `change` event -> adapter (secondaryDragMode -> dragMode string).
+  const handleDragModeChange = useCallback(
+    (mode: DragMode) => {
+      if (nvRef.current) nvRef.current.secondaryDragMode = DRAG_MODE[mode];
     },
     [nvRef],
   );
@@ -206,6 +216,7 @@ export function useViewerOptions(
     syncViewerOptionsFromNiivue,
     debouncedGLUpdate,
     handleViewMode,
+    handleDragModeChange,
     handleCrosshairWidthChange,
     handleCrosshairGapChange,
     handleInterpolateVoxelsChange,
