@@ -1,4 +1,6 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { registerNiivueEvents } from "@/store/niivue-sync";
+import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useLocation } from "@/hooks/use-location";
 import { useVolumes } from "@/hooks/use-volumes";
@@ -25,6 +27,11 @@ const noopSurface = () => {};
 
 export default function QaViewer() {
   const nvRef = useRef<Niivue | null>(nv);
+
+  // Event-driven store sync for this viewer's instance (see FreeBrowse).
+  useEffect(() => {
+    return registerNiivueEvents(nv, createStoreSyncTarget(nv));
+  }, []);
 
   const {
     viewerOptions,

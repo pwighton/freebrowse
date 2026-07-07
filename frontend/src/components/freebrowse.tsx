@@ -1,4 +1,6 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { registerNiivueEvents } from "@/store/niivue-sync";
+import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useLocation } from "@/hooks/use-location";
 import { useVolumes } from "@/hooks/use-volumes";
@@ -34,6 +36,16 @@ const nv = new Niivue({
 
 export default function FreeBrowse() {
   const nvRef = useRef<Niivue | null>(nv);
+
+  // Event-driven sync: the Zustand store is a derived view of niivue state.
+  // registerNiivueEvents subscribes the store adapter to niivue's events, so
+  // both FreeBrowse's own command wrappers and external callers driving the
+  // instance (window.freebrowse.nv) update the UI through the same path.
+  useEffect(() => {
+    const teardown = registerNiivueEvents(nv, createStoreSyncTarget(nv));
+    (window as unknown as { freebrowse?: { nv: Niivue } }).freebrowse = { nv };
+    return teardown;
+  }, []);
 
   // --- Hooks ---
   const {

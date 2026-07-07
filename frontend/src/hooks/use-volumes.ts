@@ -7,6 +7,10 @@ export function useVolumes(
   debouncedGLUpdate: () => void,
   removeSurface: (surfaceIndex: number) => void,
 ) {
+  // Contrast/colormap/opacity now go through nv.setVolume (which refreshes the
+  // GPU itself and emits volumeUpdated), so the debounced GL update is no
+  // longer needed here; kept in the signature for call-site stability.
+  void debouncedGLUpdate;
   const currentImageIndex = useFreeBrowseStore((s) => s.currentImageIndex);
   const setCurrentImageIndex = useFreeBrowseStore((s) => s.setCurrentImageIndex);
   const volumeVersion = useFreeBrowseStore((s) => s.volumeVersion);
@@ -73,22 +77,19 @@ export function useVolumes(
     (newContrastMin: number) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      nv.volumes[currentImageIndex].calMin = newContrastMin;
-      debouncedGLUpdate();
-      incrementVolumeVersion();
+      // setVolume emits volumeUpdated -> the store follows via the event adapter.
+      void nv.setVolume(currentImageIndex, { calMin: newContrastMin });
     },
-    [currentImageIndex, nvRef, debouncedGLUpdate, incrementVolumeVersion],
+    [currentImageIndex, nvRef],
   );
 
   const handleContrastMaxChange = useCallback(
     (newContrastMax: number) => {
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      nv.volumes[currentImageIndex].calMax = newContrastMax;
-      debouncedGLUpdate();
-      incrementVolumeVersion();
+      void nv.setVolume(currentImageIndex, { calMax: newContrastMax });
     },
-    [currentImageIndex, nvRef, debouncedGLUpdate, incrementVolumeVersion],
+    [currentImageIndex, nvRef],
   );
 
   const handleLabelVolumeChange = useCallback(
@@ -111,11 +112,9 @@ export function useVolumes(
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
       const volume = nv.volumes[currentImageIndex];
       if (volume.colormap === newColormap) return;
-      volume.colormap = newColormap;
-      debouncedGLUpdate();
-      incrementVolumeVersion();
+      void nv.setVolume(currentImageIndex, { colormap: newColormap });
     },
-    [currentImageIndex, nvRef, debouncedGLUpdate, incrementVolumeVersion],
+    [currentImageIndex, nvRef],
   );
 
   const handleMoveVolumeUp = useCallback(() => {
