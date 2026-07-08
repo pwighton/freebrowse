@@ -184,16 +184,50 @@ export function useVolumes(
 
   const handleEditVolume = useCallback(
     async (imageIndex: number) => {
-      // MIGRATION-TODO(P4): "edit volume as drawing" depends on the drawing
-      // subsystem (saveVolume -> File -> loadDrawing, uint8 handling) migrated
-      // in the drawing phase. Stubbed and hidden in the UI until then.
-      void imageIndex;
-      void drawingOptions;
-      void setDrawingOptions;
-      void setActiveTab;
-      console.warn("handleEditVolume: disabled during niivue-mono migration (P4)");
+      const nv = nvRef.current;
+      if (!nv || !nv.volumes[imageIndex]) return;
+      const volume = nv.volumes[imageIndex];
+      // Carry the volume's colormap onto the drawing so it looks the same as an
+      // editable layer (inverse of save-drawing). Captured before removal.
+      const cmap = volume.colormap as string | undefined;
+      const name = ((volume.name as string) || "edit.nii").replace(/\.gz$/i, "");
+      // Export the volume's voxels (uint8 — canEditVolume gates this) as raw bytes.
+      const bytes = (await nv.saveVolume({
+        filename: "",
+        volumeByIndex: imageIndex,
+      })) as Uint8Array;
+      if (!(bytes instanceof Uint8Array)) return;
+      const file = new File([bytes], name, { type: "application/octet-stream" });
+
+      // The volume becomes the editable drawing.
+      await nv.removeVolume(imageIndex);
+      await nv.loadDrawing(file); // -> drawingChanged 'load' -> adapter enabled=true
+      if (cmap) nv.drawColormap = cmap;
+
+      // Enter pen mode with the current pen settings.
+      nv.drawPenValue = drawingOptions.penErases ? 0 : drawingOptions.penValue;
+      nv.drawPenFilled = drawingOptions.penFill;
+      nv.drawIsFillOverwriting = drawingOptions.penFill;
+      nv.drawIsEnabled = true;
+      setDrawingOptions((prev) => ({ ...prev, mode: "pen" }));
+
+      // Keep the selection valid now that a volume was removed.
+      if (currentImageIndex !== null && currentImageIndex >= imageIndex) {
+        const next = Math.max(0, currentImageIndex - 1);
+        setCurrentImageIndex(nv.volumes.length > 0 ? next : null);
+      }
+      setActiveTab("drawing");
     },
-    [drawingOptions, setDrawingOptions, setActiveTab],
+    [
+      nvRef,
+      currentImageIndex,
+      drawingOptions.penErases,
+      drawingOptions.penValue,
+      drawingOptions.penFill,
+      setCurrentImageIndex,
+      setDrawingOptions,
+      setActiveTab,
+    ],
   );
 
   const canEditVolume = useCallback(
