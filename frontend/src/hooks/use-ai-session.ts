@@ -5,7 +5,7 @@ import {
   requestImagingUploadConfirmation,
   requestSessionDeleteConfirmation,
 } from "@/lib/confirmations";
-import { uint8ArrayToBase64 } from "@/lib/niivue-helpers";
+import { gzipUint8Array, uint8ArrayToBase64 } from "@/lib/niivue-helpers";
 import type { AiSessionSummary } from "@/store/ai-slice";
 
 const SESSION_NAME_RE = /^[A-Za-z0-9_-]+$/;
@@ -38,15 +38,32 @@ async function exportAndUploadDrawing(
   nv: Niivue,
   sessionName: string,
 ): Promise<string | null> {
-  // MIGRATION-TODO(P4): export the niivue drawing bitmap (was nv.drawBitmap +
-  // volume.saveToUint8Array) as a gzipped NIfTI and upload it as
-  // annotations.nii.gz, then return its relative path.
-  void nv;
-  void sessionName;
-  console.warn(
-    "exportAndUploadDrawing: disabled during niivue-mono migration (P4)",
-  );
-  return null;
+  if (!nv.drawingVolume || nv.volumes.length === 0) return null;
+  // saveVolume returns raw bytes only for an empty filename (a `.gz` name
+  // downloads instead) — export raw, then gzip to match the old
+  // `saveToUint8Array("annotations.nii.gz", drawBitmap)` behavior.
+  const raw = await nv.saveVolume({
+    filename: "",
+    isSaveDrawing: true,
+    volumeByIndex: 0,
+  });
+  if (!(raw instanceof Uint8Array)) return null;
+  const bytes = await gzipUint8Array(raw);
+  const annotRel = "annotations.nii.gz";
+  const targetPath = `ai-sessions/${sessionName}/${annotRel}`;
+  const res = await fetch("/data/nii", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: targetPath,
+      data: uint8ArrayToBase64(bytes),
+    }),
+  });
+  if (!res.ok)
+    throw new Error(
+      `annotations upload failed: ${res.status} ${res.statusText}`,
+    );
+  return annotRel;
 }
 
 async function postSetAnnots(
@@ -117,13 +134,17 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
     const nv = nvRef.current;
     if (!nv) return;
     const penValue = drawingOptions.penValue === 2 ? 2 : 1;
-    // MIGRATION-TODO(P4): re-enable drawing and set the prompt draw colormap,
-    // pen value/fill, and draw opacity via the niivue-mono API (was
-    // setDrawingEnabled/setDrawColormap/setPenValue/setDrawOpacity).
-    void AI_PROMPT_COLORMAP;
-    console.warn(
-      "enterDrawMode: drawing setup disabled during niivue-mono migration (P4)",
-    );
+    // Create the prompt drawing layer (niivue-mono no longer auto-creates it),
+    // register + select the prompt colormap (index 1 = positive/green,
+    // 2 = negative/red), and set pen defaults. Pen stays disabled until the
+    // user picks + Positive / − Negative (the AI tab routes those through
+    // use-drawing's handleDrawModeChange, which enables the pen).
+    if (!nv.drawingVolume) nv.createEmptyDrawing();
+    nv.addColormap("ai_prompt", AI_PROMPT_COLORMAP);
+    nv.drawColormap = "ai_prompt";
+    nv.drawPenValue = penValue;
+    nv.drawOpacity = 1.0;
+    nv.drawIsEnabled = false;
     setDrawingOptions((prev) => ({
       ...prev,
       enabled: true,
@@ -137,12 +158,10 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
   const exitDrawModeLocal = useCallback(() => {
     const nv = nvRef.current;
     if (nv) {
-      // MIGRATION-TODO(P4): disable drawing, reset clickToSegment, and close the
-      // drawing layer via the niivue-mono API (was setDrawingEnabled/
-      // opts.clickToSegment/closeDrawing).
-      console.warn(
-        "exitDrawModeLocal: drawing teardown disabled during niivue-mono migration (P4)",
-      );
+      // Disable the pen and destroy the drawing layer (clickToSegment is gone in
+      // niivue-mono). closeDrawing -> drawingChanged 'close' -> adapter enabled=false.
+      nv.drawIsEnabled = false;
+      nv.closeDrawing();
     }
     setDrawingOptions((prev) => ({ ...prev, enabled: false, mode: "none" }));
     setAiActiveSession(null);
@@ -187,13 +206,11 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
       if (needsUpload) {
         const basename = ensureNiiName(volume.name);
         const targetPath = `ai-sessions/${trimmed}/${basename}`;
-        // MIGRATION-TODO(P4): export the loaded volume to a (gzipped) NIfTI
-        // Uint8Array via the niivue-mono API (was volume.saveToUint8Array)
-        // before uploading it to the backend.
-        console.warn(
-          "handleNewSession: volume export disabled during niivue-mono migration (P4)",
-        );
-        const uint8Array = new Uint8Array();
+        // Export the loaded volume's voxels (raw) and gzip for a .nii.gz upload
+        // (was volume.saveToUint8Array(basename)).
+        const raw = await nv.saveVolume({ filename: "", volumeByIndex: 0 });
+        const uint8Array =
+          raw instanceof Uint8Array ? await gzipUint8Array(raw) : new Uint8Array();
         const base64Data = uint8ArrayToBase64(uint8Array);
 
         const uploadRes = await fetch("/data/nii", {
@@ -260,13 +277,15 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
         try {
           const annotUrl = `/data/ai-sessions/${summary.session_name}/${summary.annotation_path}`;
           const bytes = await fetchArrayBuffer(annotUrl);
-          // MIGRATION-TODO(P4): convert the fetched annotation bytes to an
-          // NVImage and load it as the drawing layer via the niivue-mono API
-          // (was nv.niftiArray2NVImage + nv.loadDrawing).
-          void bytes;
-          console.warn(
-            "handleLoadSession: annotation load disabled during niivue-mono migration (P4)",
-          );
+          // Load the annotation mask as the drawing layer. loadDrawing takes a
+          // File|string and gunzips by the .gz name; it hard-requires uint8
+          // (annotation masks are uint8). (was niftiArray2NVImage + loadDrawing.)
+          const file = new File([bytes], summary.annotation_path);
+          const ok = await nv.loadDrawing(file);
+          if (!ok)
+            console.warn(
+              "loadDrawing returned false — annotation dimensions may not match the volume",
+            );
         } catch (err) {
           console.error("Failed to load existing annotations:", err);
         }
@@ -308,15 +327,27 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
       }
       await inferRes.json();
 
-      // MIGRATION-TODO(P4): remove any prior AI result overlay and load the
-      // fresh result volume with its colormap/opacity via the niivue-mono API
-      // (was nv.removeVolumeByIndex / nv.addColormap / nv.addVolumeFromUrl).
-      void RESULT_FILENAME;
-      void AI_RESULT_COLORMAP_NAME;
-      void AI_RESULT_COLORMAP;
-      console.warn(
-        "handleRunSegmentation: result overlay load disabled during niivue-mono migration (P4)",
-      );
+      // Replace any prior result overlay before loading the fresh one.
+      const lastIdx = nv.volumes.length - 1;
+      if (lastIdx > 0) {
+        const last = nv.volumes[lastIdx];
+        const lastName = typeof last?.name === "string" ? last.name : "";
+        const lastUrl = typeof last?.url === "string" ? last.url : "";
+        if (lastName === RESULT_FILENAME || lastUrl.includes(`/${RESULT_FILENAME}`)) {
+          await nv.removeVolume(lastIdx); // was removeVolumeByIndex
+        }
+      }
+
+      const resultUrl =
+        `/data/ai-sessions/${active.session_name}/${RESULT_FILENAME}` +
+        `?t=${Date.now()}`;
+      nv.addColormap(AI_RESULT_COLORMAP_NAME, AI_RESULT_COLORMAP);
+      await nv.addVolume({
+        url: resultUrl,
+        name: RESULT_FILENAME,
+        colormap: AI_RESULT_COLORMAP_NAME,
+        opacity: 0.5,
+      });
       incrementVolumeVersion();
     },
     [nvRef, incrementVolumeVersion],

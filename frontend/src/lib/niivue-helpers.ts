@@ -38,3 +38,20 @@ export function uint8ArrayToBase64(uint8Array: Uint8Array): string {
   }
   return btoa(binaryString);
 }
+
+/**
+ * Gzip a byte array with the browser-native `CompressionStream('gzip')`.
+ *
+ * niivue-mono's `saveVolume` returns raw (uncompressed) bytes only for an empty
+ * filename — a `.gz` filename triggers a browser download instead of returning
+ * bytes. So the AI upload path exports raw bytes via `saveVolume({filename:''})`
+ * and gzips them here (matching old FreeBrowse's `saveToUint8Array(name.gz)`),
+ * with no extra dependency.
+ */
+export async function gzipUint8Array(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Response(bytes).body?.pipeThrough(
+    new CompressionStream("gzip"),
+  );
+  if (!stream) throw new Error("gzip: no readable stream from input");
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
