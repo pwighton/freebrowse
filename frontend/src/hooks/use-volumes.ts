@@ -7,9 +7,11 @@ import type { NiiVueGPU as Niivue } from "@niivue/niivue";
  * gradients). When one of these is selected, FreeBrowse applies it as a label
  * colormap (setColormapLabel) so the volume renders as discrete regions.
  * niivue-mono does not tag colormaps as label-vs-continuous, so this list is
- * curated here; matched case-insensitively against nv.colormaps.
+ * curated here; matched case-insensitively against nv.colormaps. Only palettes
+ * we've made opaque (alpha 255) are included — random/nih still ship alpha 64
+ * and would wash out, so they're excluded pending the Phase-7 systemic fix.
  */
-const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256", "random", "nih"]);
+const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256"]);
 
 export function useVolumes(
   nvRef: React.RefObject<Niivue | null>,

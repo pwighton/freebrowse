@@ -149,12 +149,38 @@ export function useDrawing(
   );
 
   const handleSaveDrawing = useCallback(async () => {
-    // MIGRATION-TODO(4b): saveVolume({isSaveDrawing:true}) -> gzip -> File ->
-    // closeDrawing() -> addVolume, then persist the draw colormap via
-    // setColormapLabel on the new volume.
-    console.warn("handleSaveDrawing: disabled until Phase 4b");
+    const nv = nvRef.current;
+    if (!nv || !nv.drawingVolume) return;
+    // Export the drawing bitmap as raw NIfTI bytes. filename '' returns a
+    // Uint8Array; since it isn't a .gz name the bytes are uncompressed, so the
+    // reloaded File must be named .nii (not .nii.gz, or the loader gunzips).
+    const bytes = (await nv.saveVolume({
+      filename: "",
+      isSaveDrawing: true,
+      volumeByIndex: 0,
+    })) as Uint8Array;
+    if (!(bytes instanceof Uint8Array)) return;
+    const name = drawingOptions.filename.replace(/\.gz$/i, "");
+    const file = new File([bytes], name, { type: "application/octet-stream" });
+
+    nv.drawIsEnabled = false;
+    nv.closeDrawing(); // -> drawingChanged 'close' -> adapter sets enabled=false
+    await nv.addVolume({ url: file, name });
+    // Persist as a label volume with a dropdown-native, opaque palette
+    // (roi_i256: sequential indices so pen values 1..N map 1:1, no `labels` so
+    // no legend). Set both colormap + colormapLabel (the 3c pattern) so it's
+    // consistent with the Scene-Details dropdown. Exact draw-color persistence
+    // is deferred (Phase 7). NOTE: the drawing's own `_draw` colormap is NOT
+    // carried over — the saved segmentation is recolored with roi_i256.
+    const idx = nv.volumes.length - 1;
+    if (idx >= 0) {
+      await nv.setVolume(idx, { colormap: "roi_i256" });
+      await nv.setColormapLabel(idx, "roi_i256");
+    }
+
+    setDrawingOptions((prev) => ({ ...prev, mode: "none" }));
     setActiveTab("sceneDetails");
-  }, [setActiveTab]);
+  }, [nvRef, drawingOptions.filename, setDrawingOptions, setActiveTab]);
 
   return {
     handleCreateDrawingLayer,

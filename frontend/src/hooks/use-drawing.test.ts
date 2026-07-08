@@ -123,4 +123,43 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     act(() => result.current.handleDrawUndo());
     expect(spy).toHaveBeenCalled();
   });
+
+  test("save drawing: export -> close -> re-add as roi_i256 label volume", async () => {
+    const nv = new NiiVueGPU();
+    nv.volumes.push({ id: "vol-0" });
+    nv.drawingVolume = { id: "drawing" };
+    const saveSpy = vi.spyOn(nv, "saveVolume");
+    const closeSpy = vi.spyOn(nv, "closeDrawing");
+    const addSpy = vi.spyOn(nv, "addVolume");
+    const volSpy = vi.spyOn(nv, "setVolume");
+    const labelSpy = vi.spyOn(nv, "setColormapLabel");
+    const { result } = render(nv, { filename: "seg.nii.gz" });
+    await act(async () => {
+      await result.current.handleSaveDrawing();
+    });
+    expect(saveSpy).toHaveBeenCalledWith({
+      filename: "",
+      isSaveDrawing: true,
+      volumeByIndex: 0,
+    });
+    expect(closeSpy).toHaveBeenCalled();
+    // Raw bytes -> File named .nii (the .gz is stripped so the loader won't gunzip).
+    expect(addSpy.mock.calls[0][0].name).toBe("seg.nii");
+    // Saved as a roi_i256 label volume (dropdown colormap + label colormap).
+    expect(volSpy).toHaveBeenCalledWith(expect.any(Number), { colormap: "roi_i256" });
+    expect(labelSpy).toHaveBeenCalledWith(expect.any(Number), "roi_i256");
+    expect(useFreeBrowseStore.getState().drawingOptions.mode).toBe("none");
+    expect(useFreeBrowseStore.getState().activeTab).toBe("sceneDetails");
+  });
+
+  test("save drawing is a no-op with no open drawing", async () => {
+    const nv = new NiiVueGPU();
+    nv.volumes.push({ id: "vol-0" });
+    const saveSpy = vi.spyOn(nv, "saveVolume");
+    const { result } = render(nv);
+    await act(async () => {
+      await result.current.handleSaveDrawing();
+    });
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
 });

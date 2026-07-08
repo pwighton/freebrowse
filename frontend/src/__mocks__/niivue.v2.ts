@@ -218,6 +218,11 @@ export class NiiVueGPU extends EventTarget {
     this.emit("frameChange", { volume, frame });
   }
 
+  async saveVolume(_options?: Record<string, unknown>): Promise<Uint8Array> {
+    // Returns raw NIfTI-ish bytes (filename '' path). Enough for command tests.
+    return new Uint8Array([1, 2, 3, 4]);
+  }
+
   async setColormapLabel(index: number, cmap: unknown): Promise<void> {
     const volume = this.volumes[index];
     if (!volume) return;
