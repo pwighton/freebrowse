@@ -238,7 +238,7 @@ export default function SurfaceDetailsTab({
                   <div className="grid gap-4 border-t pt-4">
                     <LabeledSliderWithInput
                       label="Contrast Min"
-                      value={selectedLayer.cal_min ?? 0}
+                      value={selectedLayer.calMin ?? 0}
                       onValueChange={onLayerCalMinChange}
                       min={-10}
                       max={10}
@@ -246,7 +246,7 @@ export default function SurfaceDetailsTab({
                     />
                     <LabeledSliderWithInput
                       label="Contrast Max"
-                      value={selectedLayer.cal_max ?? 1}
+                      value={selectedLayer.calMax ?? 1}
                       onValueChange={onLayerCalMaxChange}
                       min={-10}
                       max={10}
@@ -276,7 +276,7 @@ export default function SurfaceDetailsTab({
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="use-negative-cmap"
-                        checked={selectedLayer.useNegativeCmap ?? false}
+                        checked={!!selectedLayer.colormapNegative}
                         onCheckedChange={(checked) =>
                           onLayerUseNegativeCmapChange(checked === true)
                         }

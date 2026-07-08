@@ -14,6 +14,10 @@ function wire() {
   return { nv, teardown };
 }
 
+// The surfaces rebuild is deferred to a microtask (so it reads nv.meshes after
+// niivue-mono's emit-before-removal). Flush before asserting surface state.
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
 describe("createStoreSyncTarget — niivue events drive the store", () => {
   test("maps flat viewer-option change events into viewerOptions", () => {
     const { nv, teardown } = wire();
@@ -75,6 +79,7 @@ describe("createStoreSyncTarget — niivue events drive the store", () => {
     const before = useFreeBrowseStore.getState().layerVersion;
     await nv.addMesh({ url: "lh.white" });
     await nv.addMeshLayer(0, { url: "lh.curv" });
+    await flush();
     expect(useFreeBrowseStore.getState().layerVersion).toBeGreaterThan(before);
     teardown();
   });
@@ -87,6 +92,7 @@ describe("createStoreSyncTarget — niivue events drive the store", () => {
       color: [1, 0, 0, 1],
       shaderType: "matcap",
     });
+    await flush();
     const surfaces = useFreeBrowseStore.getState().surfaces;
     const s = surfaces[surfaces.length - 1];
     expect(s.name).toBe("LH");
@@ -96,6 +102,7 @@ describe("createStoreSyncTarget — niivue events drive the store", () => {
 
     // Visibility is opacity-derived (niivue-mono has no rendered mesh.visible).
     await nv.setMesh(nv.meshes.length - 1, { opacity: 0 });
+    await flush();
     const after = useFreeBrowseStore.getState().surfaces;
     expect(after[after.length - 1].visible).toBe(false);
     expect(after[after.length - 1].opacity).toBe(0);

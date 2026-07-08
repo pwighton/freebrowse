@@ -194,8 +194,10 @@ export class NiiVueGPU extends EventTarget {
   }
 
   removeVolume(index: number): void {
-    const [volume] = this.volumes.splice(index, 1);
+    // Emit BEFORE removal, matching real niivue-mono (item present at emit time).
+    const volume = this.volumes[index];
     this.emit("volumeRemoved", { volume, index });
+    this.volumes.splice(index, 1);
   }
 
   async setVolume(
@@ -247,15 +249,19 @@ export class NiiVueGPU extends EventTarget {
   }
 
   async addMesh(opts: Record<string, unknown>): Promise<void> {
-    const mesh: MockMesh = { id: `mesh-${this.meshes.length}`, ...opts };
+    // Real niivue-mono meshes have NO id (unlike volumes); don't fake one, so
+    // tests can't rely on it.
+    const mesh: MockMesh = { ...opts };
     if (!mesh.layers) mesh.layers = [];
     this.meshes.push(mesh);
     this.emit("meshLoaded", { mesh });
   }
 
   removeMesh(index: number): void {
-    const [mesh] = this.meshes.splice(index, 1);
+    // Emit BEFORE removal, matching real niivue-mono.
+    const mesh = this.meshes[index];
     this.emit("meshRemoved", { mesh, index });
+    this.meshes.splice(index, 1);
   }
 
   async setMesh(

@@ -30,7 +30,6 @@ type NiivueReader = NiivueEventSource & {
 
 /** Minimal mesh shape read when rebuilding the surfaces list. */
 type MeshLike = {
-  id?: string;
   name?: string;
   opacity?: number;
   color?: [number, number, number, number];
@@ -151,22 +150,27 @@ export function createStoreSyncTarget(nv: NiivueReader): NiivueSyncTarget {
 
     onSurfacesChanged() {
       // Rebuild the derived surfaces list from live nv.meshes (the old
-      // updateSurfaceDetails, now event-driven). layerVersion bump covers
-      // layer-only changes that don't alter the SurfaceDetails fields.
-      const meshes = nv.meshes as MeshLike[];
-      store().setSurfaces(
-        meshes.map((mesh, index) => ({
-          id: mesh.id ?? `mesh-${index}`,
-          name: mesh.name || `Surface ${index + 1}`,
-          // niivue-mono does not render a mesh `visible` flag, so FreeBrowse
-          // models surface visibility via opacity (0 == hidden), like volumes.
-          visible: (mesh.opacity ?? 1.0) > 0,
-          opacity: mesh.opacity ?? 1.0,
-          rgba255: colorToRgba255(mesh.color),
-          shaderType: mesh.shaderType || "phong",
-        })),
-      );
-      store().incrementLayerVersion();
+      // updateSurfaceDetails, now event-driven). niivue-mono emits *Removed
+      // BEFORE mutating the model (the removed item is still present at emit
+      // time), so read nv.meshes on a microtask — after the synchronous
+      // add/remove completes — to capture the post-mutation list. (Volumes
+      // avoid this by reading nv.volumes at render via the version counter.)
+      queueMicrotask(() => {
+        const meshes = nv.meshes as MeshLike[];
+        store().setSurfaces(
+          meshes.map((mesh, index) => ({
+            id: `surface-${index}`,
+            name: mesh.name || `Surface ${index + 1}`,
+            // niivue-mono does not render a mesh `visible` flag, so FreeBrowse
+            // models surface visibility via opacity (0 == hidden), like volumes.
+            visible: (mesh.opacity ?? 1.0) > 0,
+            opacity: mesh.opacity ?? 1.0,
+            rgba255: colorToRgba255(mesh.color),
+            shaderType: mesh.shaderType || "phong",
+          })),
+        );
+        store().incrementLayerVersion();
+      });
     },
 
     onDrawingChanged() {
