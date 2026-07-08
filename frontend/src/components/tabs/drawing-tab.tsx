@@ -11,9 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { LabeledSliderWithInput } from "@/components/ui/labeled-slider-with-input";
 import { Select } from "@/components/ui/select";
+import { type NiiVueGPU as Niivue } from "@niivue/niivue";
 
 interface DrawingTabProps {
+  nvRef: React.RefObject<Niivue | null>;
   onDrawModeChange: (mode: "none" | "pen" | "wand") => void;
+  onDrawingColormapChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   onPenFillChange: (checked: boolean) => void;
   onPenErasesChange: (checked: boolean) => void;
   onPenValueChange: (value: number) => void;
@@ -26,7 +29,9 @@ interface DrawingTabProps {
 }
 
 export default function DrawingTab({
+  nvRef,
   onDrawModeChange,
+  onDrawingColormapChange,
   onPenFillChange,
   onPenErasesChange,
   onPenValueChange,
@@ -39,6 +44,9 @@ export default function DrawingTab({
 }: DrawingTabProps) {
   const drawingOptions = useFreeBrowseStore((s) => s.drawingOptions);
   const setDrawingOptions = useFreeBrowseStore((s) => s.setDrawingOptions);
+
+  // Drawing colormaps are the `_`-prefixed draw LUTs, NOT the volume colormaps.
+  const drawColormaps: string[] = nvRef.current?.drawingColormaps ?? [];
 
   return (
     <div className="flex flex-col h-full">
@@ -80,6 +88,21 @@ export default function DrawingTab({
                 step={0.01}
               />
 
+              {/* Drawing Colormap */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Drawing Colormap</Label>
+                <Select
+                  value={drawingOptions.colormap}
+                  onChange={onDrawingColormapChange}
+                >
+                  {drawColormaps.map((cm) => (
+                    <option key={cm} value={cm}>
+                      {cm}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
               {/* Draw Mode Selector */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">
@@ -95,7 +118,10 @@ export default function DrawingTab({
                 >
                   <option value="none">None</option>
                   <option value="pen">Pen</option>
-                  <option value="wand">Magic Wand</option>
+                  {/* Magic Wand disabled until Phase 4c (nv-ext-drawing) */}
+                  <option value="wand" disabled>
+                    Magic Wand (coming soon)
+                  </option>
                 </Select>
               </div>
 

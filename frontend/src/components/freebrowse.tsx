@@ -93,8 +93,8 @@ export default function FreeBrowse() {
     handleCancelRemove,
   } = useVolumes(nvRef, debouncedGLUpdate, removeSurface);
   const {
-    syncDrawingOptionsFromNiivue,
     handleCreateDrawingLayer,
+    handleDrawingColormapChange,
     handleDrawModeChange,
     handlePenFillChange,
     handlePenErasesChange,
@@ -132,7 +132,6 @@ export default function FreeBrowse() {
     syncViewerOptionsFromNiivue,
     updateSurfaceDetails,
     handleLocationChange,
-    syncDrawingOptionsFromNiivue,
   );
 
   useAiCapabilities();
@@ -185,6 +184,7 @@ export default function FreeBrowse() {
           onLayerUseNegativeCmapChange={handleLayerUseNegativeCmapChange}
           onCreateDrawingLayer={handleCreateDrawingLayer}
           onDrawModeChange={handleDrawModeChange}
+          onDrawingColormapChange={handleDrawingColormapChange}
           onPenFillChange={handlePenFillChange}
           onPenErasesChange={handlePenErasesChange}
           onPenValueChange={handlePenValueChange}

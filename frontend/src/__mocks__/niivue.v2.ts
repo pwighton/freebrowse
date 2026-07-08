@@ -65,6 +65,7 @@ export class NiiVueGPU extends EventTarget {
   volumes: MockVolume[] = [];
   meshes: MockMesh[] = [];
   drawingVolume: unknown = null;
+  drawPenFilled = false; // plain field on the real controller (no event)
   canvas: HTMLCanvasElement | null = null;
   model: { removeVolume: (index: number) => void };
 
@@ -350,6 +351,10 @@ export class NiiVueGPU extends EventTarget {
   }
   get meshShaders(): string[] {
     return ["phong", "matcap", "outline"];
+  }
+
+  get drawingColormaps(): string[] {
+    return ["_draw", "_itksnap", "_slicer3d"];
   }
 }
 

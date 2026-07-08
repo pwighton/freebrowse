@@ -206,6 +206,11 @@ export function useVolumes(
       if (volume === background) return false;
       if (!volume.hdr || !background.hdr) return false;
 
+      // niivue-mono's loadDrawing hard-requires DT_UINT8 (datatypeCode 2) and
+      // rejects anything else, so a non-uint8 volume can't be edited as a
+      // drawing — grey out the button rather than convert.
+      if (volume.hdr.datatypeCode !== 2) return false;
+
       const volDims = volume.hdr.dims;
       const backDims = background.hdr.dims;
 

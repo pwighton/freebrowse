@@ -55,7 +55,6 @@ export default function QaViewer() {
     syncViewerOptionsFromNiivue,
     () => {},
     handleLocationChange,
-    () => {},
   );
 
   return (

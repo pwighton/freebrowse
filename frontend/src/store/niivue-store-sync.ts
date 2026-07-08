@@ -118,21 +118,17 @@ export function createStoreSyncTarget(nv: NiivueReader): NiivueSyncTarget {
     },
 
     onDrawingOptionChange(property, value) {
-      // MIGRATION-TODO(P4): full drawing-state mapping lands with the drawing
-      // phase; these are the direct scalar mirrors that already line up.
+      // Only the event-mirrored drawing fields are handled here. penValue/mode/
+      // penErases are store-owned (drawPenValue is a derived value that would
+      // clobber penValue on erase), and `enabled` follows drawingChanged
+      // (drawingVolume presence), not drawIsEnabled (pointer painting).
       const s = store();
       switch (property) {
-        case "drawPenValue":
-          s.setDrawingOptions((prev) => ({ ...prev, penValue: value as number }));
-          break;
         case "drawOpacity":
           s.setDrawingOptions((prev) => ({ ...prev, opacity: value as number }));
           break;
-        case "drawIsFillOverwriting":
-          s.setDrawingOptions((prev) => ({ ...prev, penFill: value as boolean }));
-          break;
-        case "drawIsEnabled":
-          s.setDrawingOptions((prev) => ({ ...prev, enabled: value as boolean }));
+        case "drawColormap":
+          s.setDrawingOptions((prev) => ({ ...prev, colormap: value as string }));
           break;
         default:
           break;
@@ -174,8 +170,13 @@ export function createStoreSyncTarget(nv: NiivueReader): NiivueSyncTarget {
     },
 
     onDrawingChanged() {
-      // MIGRATION-TODO(P4): mirror drawing state (drawingVolume presence, undo
-      // depth) into the drawing slice during the drawing phase.
+      // `enabled` == a drawing layer exists (create/load -> present, close ->
+      // gone). drawingChanged fires on create/stroke/undo/close/load, so read
+      // drawingVolume presence each time.
+      const hasDrawing =
+        (nv as { drawingVolume?: unknown }).drawingVolume != null;
+      store().setDrawingOptions((prev) => ({ ...prev, enabled: hasDrawing }));
+      store().incrementVolumeVersion(); // the drawing bitmap changed; repaint
     },
 
     onLocationChange(location) {

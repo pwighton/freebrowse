@@ -9,7 +9,6 @@ export function useFileLoading(
   syncViewerOptionsFromNiivue: () => void,
   updateSurfaceDetails: () => void,
   handleLocationChange: (locationObject: any) => void,
-  syncDrawingOptionsFromNiivue: () => void,
 ) {
   const showUploader = useFreeBrowseStore((s) => s.showUploader);
   const setShowUploader = useFreeBrowseStore((s) => s.setShowUploader);
@@ -261,15 +260,12 @@ export function useFileLoading(
 
     nv.addEventListener("dragRelease", onDragRelease);
     nv.addEventListener("locationChange", onLocationChange);
-    // MIGRATION-TODO(P4): the old onOptsChange sync only existed to track the
-    // click-to-segment wand threshold; that opt is gone from core niivue.
-    void syncDrawingOptionsFromNiivue;
 
     return () => {
       nv.removeEventListener("dragRelease", onDragRelease);
       nv.removeEventListener("locationChange", onLocationChange);
     };
-  }, [nvRef, handleLocationChange, syncDrawingOptionsFromNiivue, incrementVolumeVersion]);
+  }, [nvRef, handleLocationChange, incrementVolumeVersion]);
 
   // Enable/disable drag-and-drop based on whether volumes are loaded
   useEffect(() => {

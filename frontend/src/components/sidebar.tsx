@@ -57,6 +57,7 @@ interface SidebarProps {
   // Drawing operations
   onCreateDrawingLayer: () => void;
   onDrawModeChange: (mode: "none" | "pen" | "wand") => void;
+  onDrawingColormapChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   onPenFillChange: (checked: boolean) => void;
   onPenErasesChange: (checked: boolean) => void;
   onPenValueChange: (value: number) => void;
@@ -188,7 +189,9 @@ export default function Sidebar(props: SidebarProps) {
 
         <TabsContent value="drawing" className="flex-1 min-h-0 p-0">
           <DrawingTab
+            nvRef={props.nvRef}
             onDrawModeChange={props.onDrawModeChange}
+            onDrawingColormapChange={props.onDrawingColormapChange}
             onPenFillChange={props.onPenFillChange}
             onPenErasesChange={props.onPenErasesChange}
             onPenValueChange={props.onPenValueChange}

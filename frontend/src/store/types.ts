@@ -35,6 +35,7 @@ export type DrawingOptions = {
   penFill: boolean;
   penErases: boolean;
   opacity: number;
+  colormap: string;
   magicWand2dOnly: boolean;
   magicWandMaxDistanceMM: number;
   magicWandThresholdPercent: number;
