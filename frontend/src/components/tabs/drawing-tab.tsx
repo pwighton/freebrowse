@@ -118,10 +118,7 @@ export default function DrawingTab({
                 >
                   <option value="none">None</option>
                   <option value="pen">Pen</option>
-                  {/* Magic Wand disabled until Phase 4c (nv-ext-drawing) */}
-                  <option value="wand" disabled>
-                    Magic Wand (coming soon)
-                  </option>
+                  <option value="wand">Magic Wand</option>
                 </Select>
               </div>
 

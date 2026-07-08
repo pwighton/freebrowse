@@ -7,6 +7,7 @@ import { useVolumes } from "@/hooks/use-volumes";
 import { useSurfaces } from "@/hooks/use-surfaces";
 import { useMeshLayers } from "@/hooks/use-mesh-layers";
 import { useDrawing } from "@/hooks/use-drawing";
+import { useMagicWand } from "@/hooks/use-magic-wand";
 import { useSave } from "@/hooks/use-save";
 import { useFileLoading } from "@/hooks/use-file-loading";
 import { useAiCapabilities } from "@/hooks/use-ai-capabilities";
@@ -106,6 +107,9 @@ export default function FreeBrowse() {
     handleDrawUndo,
     handleSaveDrawing,
   } = useDrawing(nvRef, debouncedGLUpdate);
+  // Magic wand (nv-ext-drawing): seeds a flood fill on slice clicks in wand
+  // mode; params flow through the store, result via drawingChanged.
+  useMagicWand(nvRef);
   const {
     handleSaveScene,
     handleConfirmSave,

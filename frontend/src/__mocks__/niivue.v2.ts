@@ -361,6 +361,71 @@ export class NiiVueGPU extends EventTarget {
   get drawingColormaps(): string[] {
     return ["_draw", "_itksnap", "_slicer3d"];
   }
+
+  // --- extension context (nv-ext-drawing / magic wand) ---
+  createExtensionContext(): MockExtensionContext {
+    return new MockExtensionContext(this);
+  }
+}
+
+/**
+ * Minimal stand-in for niivue-mono's NVExtensionContext. `drawing` /
+ * `backgroundVolume` are live getters (null until a drawing layer / volume
+ * exists, matching the real getters); `on`/`off`/`dispose` subscribe to the
+ * controller's EventTarget (tests fire `nv.emit('slicePointerUp', ...)`).
+ * `drawing.update` records the last bitmap and emits `drawingChanged` like the
+ * real context.
+ */
+export class MockExtensionContext {
+  private _listeners = new Map<string, EventListener>();
+  /** Last bitmap passed to drawing.update — asserted by tests. */
+  lastUpdate: Uint8Array | null = null;
+
+  private readonly _dims = { dimX: 2, dimY: 2, dimZ: 2 };
+  private readonly _drawing = {
+    bitmap: new Uint8Array(8),
+    dims: this._dims,
+    voxelSizeMM: [1, 1, 1] as [number, number, number],
+    update: (b: Uint8Array): void => {
+      this.lastUpdate = b;
+      this.nv.emit("drawingChanged", { action: "update" });
+    },
+  };
+  private readonly _bg = {
+    imgRAS: new Float32Array(8) as Float32Array | null,
+    calMin: 0,
+    calMax: 100,
+    robustMin: 0,
+    robustMax: 100,
+    dims: this._dims,
+    voxelSizeMM: [1, 1, 1] as [number, number, number],
+  };
+
+  constructor(private nv: NiiVueGPU) {}
+
+  get drawing() {
+    return this.nv.drawingVolume ? this._drawing : null;
+  }
+  get backgroundVolume() {
+    return this.nv.volumes.length > 0 ? this._bg : null;
+  }
+
+  on(type: string, listener: (e: CustomEvent) => void): void {
+    const l = listener as EventListener;
+    this._listeners.set(type, l);
+    this.nv.addEventListener(type, l);
+  }
+  off(type: string, listener?: (e: CustomEvent) => void): void {
+    const l = (listener as EventListener) ?? this._listeners.get(type);
+    if (l) this.nv.removeEventListener(type, l);
+    this._listeners.delete(type);
+  }
+  dispose(): void {
+    for (const [type, l] of this._listeners) {
+      this.nv.removeEventListener(type, l);
+    }
+    this._listeners.clear();
+  }
 }
 
 export default NiiVueGPU;
