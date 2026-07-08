@@ -2,6 +2,15 @@ import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
 import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 
+/**
+ * Built-in colormaps that are categorical/label maps (as opposed to continuous
+ * gradients). When one of these is selected, FreeBrowse applies it as a label
+ * colormap (setColormapLabel) so the volume renders as discrete regions.
+ * niivue-mono does not tag colormaps as label-vs-continuous, so this list is
+ * curated here; matched case-insensitively against nv.colormaps.
+ */
+const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256", "random", "nih"]);
+
 export function useVolumes(
   nvRef: React.RefObject<Niivue | null>,
   debouncedGLUpdate: () => void,
@@ -92,27 +101,22 @@ export function useVolumes(
     [currentImageIndex, nvRef],
   );
 
-  const handleLabelVolumeChange = useCallback(
-    (checked: boolean) => {
-      const nv = nvRef.current;
-      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      // MIGRATION-TODO(P3): the old intent_code=1002 toggle is replaced by
-      // nv.setColormapLabel(index, cmap|null) + makeLabelLut. Stubbed until
-      // meshes/labels phase.
-      void checked;
-      incrementVolumeVersion();
-    },
-    [currentImageIndex, nvRef, incrementVolumeVersion],
-  );
-
   const handleColormapChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
       const newColormap = event.target.value;
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
-      const volume = nv.volumes[currentImageIndex];
-      if (volume.colormap === newColormap) return;
+      // Always set the continuous colormap (so the dropdown value derives from
+      // volume.colormap and round-trips through the document). If the chosen
+      // colormap is categorical, ALSO attach it as a label colormap so the
+      // volume renders as discrete regions; otherwise clear any label colormap.
+      // colormapLabel overrides colormap in the renderer, so setting both is safe.
       void nv.setVolume(currentImageIndex, { colormap: newColormap });
+      if (LABEL_COLORMAPS.has(newColormap.toLowerCase())) {
+        void nv.setColormapLabel(currentImageIndex, newColormap);
+      } else {
+        void nv.setColormapLabel(currentImageIndex, null);
+      }
     },
     [currentImageIndex, nvRef],
   );
@@ -260,7 +264,6 @@ export function useVolumes(
     handleContrastMinChange,
     handleContrastMaxChange,
     handleColormapChange,
-    handleLabelVolumeChange,
     handleMoveVolumeUp,
     handleMoveVolumeDown,
     removeVolume,
