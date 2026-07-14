@@ -1,8 +1,34 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { uint8ArrayToBase64 } from "@/lib/niivue-helpers";
+import { gzipUint8Array, uint8ArrayToBase64 } from "@/lib/niivue-helpers";
+import {
+  decodeDocument,
+  documentToJson,
+  stripEmbeddedData,
+  toJsonSafe,
+  encodeDocument,
+} from "@/lib/nvd-json";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
+import type { NvdFormat } from "@/store/types";
 import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+
+/** Append the given extension if the filename lacks it. */
+function ensureExt(name: string, ext: string): string {
+  return name.toLowerCase().endsWith(ext) ? name : name + ext;
+}
+
+/** Trigger a browser download of `bytes` as `filename`. */
+function downloadBytes(bytes: Uint8Array | string, filename: string, type: string) {
+  const blob = new Blob([bytes], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export function useSave(nvRef: React.RefObject<Niivue | null>) {
   const saveDialogOpen = useFreeBrowseStore((s) => s.saveDialogOpen);
@@ -33,6 +59,7 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
         document: {
           enabled: false,
           location: "",
+          format: "json",
         },
         volumes: volumeStates,
       });
@@ -50,12 +77,21 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
     if (saveState.isDownloadMode) {
       // Download mode
       if (saveState.document.enabled && saveState.document.location.trim()) {
-        // MIGRATION-TODO(P5): serialize the scene document via nv.serializeDocument()
-        // (CBOR) through a JSON adapter, strip meshes, blank out image URLs, and
-        // trigger a browser download of the resulting .nvd file.
-        console.warn(
-          "document serialization (download): disabled during niivue-mono migration (P5)",
-        );
+        try {
+          const filename = ensureExt(saveState.document.location.trim(), ".nvd");
+          const cbor = nvRef.current.serializeDocument();
+          if (saveState.document.format === "cbor") {
+            // Binary CBOR (vanilla niivue-mono / ipyniivue).
+            downloadBytes(cbor, filename, "application/cbor");
+          } else {
+            // FreeBrowse JSON (lossless via the tagged adapter). Embeds
+            // everything, including meshes.
+            const json = JSON.stringify(documentToJson(cbor));
+            downloadBytes(json, filename, "application/json");
+          }
+        } catch (error) {
+          console.error("Error downloading document:", error);
+        }
       }
 
       // Download enabled volumes
@@ -66,31 +102,23 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
           nvRef.current &&
           nvRef.current.volumes[index]
         ) {
-          const volume = nvRef.current.volumes[index];
-          const filename = volumeState.url || `volume_${index + 1}.nii.gz`;
+          const filename = ensureExt(
+            volumeState.url || `volume_${index + 1}.nii.gz`,
+            ".nii.gz",
+          );
 
           try {
-            // MIGRATION-TODO(P5): serialize the volume via nv.saveVolume(...)
-            // (replaces the removed volume.saveToUint8Array) and download it.
-            console.warn(
-              "saveToUint8Array (download): disabled during niivue-mono migration (P5)",
-            );
-            void volume;
-            const uint8Array = new Uint8Array();
-
-            const blob = new Blob([uint8Array], {
-              type: "application/octet-stream",
+            // saveVolume with an empty filename returns raw NIfTI bytes; gzip
+            // them for a .nii.gz download.
+            const raw = await nvRef.current.saveVolume({
+              filename: "",
+              volumeByIndex: index,
             });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename.endsWith(".nii.gz")
-              ? filename
-              : `${filename}.nii.gz`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            if (!(raw instanceof Uint8Array)) {
+              throw new Error("saveVolume did not return bytes");
+            }
+            const bytes = await gzipUint8Array(raw);
+            downloadBytes(bytes, filename, "application/octet-stream");
           } catch (error) {
             console.error(`Error downloading volume ${index}:`, error);
           }
@@ -99,12 +127,39 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
     } else {
       // Save to backend mode
       if (saveState.document.enabled && saveState.document.location.trim()) {
-        // MIGRATION-TODO(P5): serialize the scene document via
-        // nv.serializeDocument() (CBOR) through a JSON adapter, remap image URLs
-        // to the requested save locations, then POST it to "/data/nvd".
-        console.warn(
-          "document serialization (backend save): disabled during niivue-mono migration (P5)",
-        );
+        try {
+          // Point each volume entry at its backend save URL, and drop embedded
+          // volume data (the backend stores volumes separately, below).
+          const volumeUrls = saveState.volumes.map((v) =>
+            v.url && v.url.trim() ? v.url : null,
+          );
+          const decoded = stripEmbeddedData(
+            decodeDocument(nvRef.current.serializeDocument()),
+            { volumeUrls },
+          );
+
+          const format: NvdFormat = saveState.document.format;
+          const data =
+            format === "cbor"
+              ? uint8ArrayToBase64(encodeDocument(decoded))
+              : toJsonSafe(decoded);
+
+          const response = await fetch("/data/nvd", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: saveState.document.location,
+              data,
+              format,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to save document: ${response.statusText}`);
+          }
+          console.log("Document saved:", await response.json());
+        } catch (error) {
+          console.error("Error saving document:", error);
+        }
       }
 
       // Save enabled volumes to backend
@@ -115,28 +170,22 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
             nvRef.current &&
             nvRef.current.volumes[index]
           ) {
-            const volume = nvRef.current.volumes[index];
-
             if (!volumeState.url || volumeState.url.trim() === "") {
               console.log(`Skipping volume ${index}: no URL specified`);
               return;
             }
 
             try {
-              const shouldCompress = volumeState.url
-                .toLowerCase()
-                .endsWith(".gz");
-              const filename = shouldCompress
-                ? volumeState.url
-                : volumeState.url + ".gz";
-              // MIGRATION-TODO(P5): serialize the volume via nv.saveVolume(...)
-              // (replaces the removed volume.saveToUint8Array) and POST it.
-              console.warn(
-                "saveToUint8Array (backend save): disabled during niivue-mono migration (P5)",
-              );
-              void volume;
-              void filename;
-              const uint8Array = new Uint8Array();
+              // saveVolume('' ) returns raw NIfTI bytes; gzip for a .nii.gz
+              // upload (the backend appends .nii.gz if the name lacks it).
+              const raw = await nvRef.current.saveVolume({
+                filename: "",
+                volumeByIndex: index,
+              });
+              if (!(raw instanceof Uint8Array)) {
+                throw new Error("saveVolume did not return bytes");
+              }
+              const uint8Array = await gzipUint8Array(raw);
               const base64Data = uint8ArrayToBase64(uint8Array);
 
               const volumeResponse = await fetch("/data/nii", {
@@ -174,6 +223,7 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
       document: {
         enabled: false,
         location: "",
+        format: "json",
       },
       volumes: [],
     });
@@ -186,6 +236,7 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
       document: {
         enabled: false,
         location: "",
+        format: "json",
       },
       volumes: [],
     });
@@ -247,6 +298,19 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
     [setSaveState],
   );
 
+  const handleDocumentFormatChange = useCallback(
+    (format: NvdFormat) => {
+      setSaveState((prev) => ({
+        ...prev,
+        document: {
+          ...prev.document,
+          format,
+        },
+      }));
+    },
+    [setSaveState],
+  );
+
   return {
     handleSaveScene,
     handleConfirmSave,
@@ -255,5 +319,6 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
     handleVolumeCheckboxChange,
     handleDocumentLocationChange,
     handleDocumentCheckboxChange,
+    handleDocumentFormatChange,
   };
 }

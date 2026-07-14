@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
+import { jsonToDocumentFile, sniffIsJson } from "@/lib/nvd-json";
 import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 
@@ -24,19 +25,55 @@ export function useFileLoading(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const surfaceFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper function to load NVD data
+  // Load a niivue Document (.nvd) into the scene.
+  //
+  // Accepts either raw bytes (from a file upload / server fetch) or an
+  // already-parsed JSON object (the embedded single-file path). Bytes are
+  // format-sniffed: a leading `{` is FreeBrowse JSON (decoded via the
+  // nvd-json.ts JSON<->CBOR adapter), anything else is niivue-mono CBOR (passed
+  // straight through). Both converge on `nv.loadDocument(File)`; the store then
+  // follows via documentLoaded/volumeLoaded/meshLoaded (niivue-store-sync).
   const loadNvdData = useCallback(
-    async (jsonData: any) => {
-      // MIGRATION-TODO(P5): document load is rebuilt in the documents phase
-      // around a JSON<->CBOR adapter (nvd-json.ts) + nv.loadDocument(File).
-      // The old-schema path (NVDocument.loadFromJSON, encodedImageBlobs,
-      // meshesString, layer-name backfill) is retired. Disabled until then.
-      void jsonData;
+    async (data: ArrayBuffer | Uint8Array | Record<string, unknown>) => {
+      const nv = nvRef.current;
+      if (!nv) return;
       void syncViewerOptionsFromNiivue;
       void updateSurfaceDetails;
-      console.warn("loadNvdData: document loading disabled during niivue-mono migration (P5)");
+
+      let file: File;
+      if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+        if (sniffIsJson(bytes)) {
+          const json = JSON.parse(new TextDecoder().decode(bytes));
+          file = jsonToDocumentFile(json);
+        } else {
+          file = new File([bytes], "scene.nvd", { type: "application/cbor" });
+        }
+      } else {
+        // Already-parsed JSON object (embedded __EMBEDDED_NVD_DATA__ path).
+        file = jsonToDocumentFile(data);
+      }
+
+      await nv.loadDocument(file);
+
+      // Select a first volume / surface so the details tabs have a target. The
+      // lists themselves follow via events.
+      if (currentImageIndex === null && nv.volumes.length > 0) {
+        setCurrentImageIndex(0);
+      }
+      if (currentSurfaceIndex === null && nv.meshes.length > 0) {
+        setCurrentSurfaceIndex(0);
+      }
     },
-    [syncViewerOptionsFromNiivue, updateSurfaceDetails],
+    [
+      nvRef,
+      syncViewerOptionsFromNiivue,
+      updateSurfaceDetails,
+      currentImageIndex,
+      currentSurfaceIndex,
+      setCurrentImageIndex,
+      setCurrentSurfaceIndex,
+    ],
   );
 
   // Add uploaded files to Niivue
@@ -71,10 +108,10 @@ export function useFileLoading(
       if (nvdFiles.length > 0) {
         const nvdFile = nvdFiles[0];
         try {
-          const text = await nvdFile.text();
-          const jsonData = JSON.parse(text);
-          console.log("NVD data loaded from uploaded file:", jsonData);
-          await loadNvdData(jsonData);
+          // Pass raw bytes: loadNvdData sniffs JSON vs CBOR.
+          const bytes = await nvdFile.arrayBuffer();
+          console.log("NVD file loaded:", nvdFile.name, bytes.byteLength, "bytes");
+          await loadNvdData(bytes);
         } catch (error) {
           console.error("Error loading uploaded NVD file:", error);
         }
@@ -155,9 +192,9 @@ export function useFileLoading(
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const jsonData = await response.json();
-        console.log("json data returned from server:");
-        console.log(jsonData);
+        // Fetch raw bytes: loadNvdData sniffs JSON vs CBOR.
+        const bytes = await response.arrayBuffer();
+        console.log(`NVD fetched from ${file.url}: ${bytes.byteLength} bytes`);
 
         setShowUploader(false);
 
@@ -172,7 +209,7 @@ export function useFileLoading(
           throw new Error("Canvas failed to initialize after 2 seconds");
         }
 
-        await loadNvdData(jsonData);
+        await loadNvdData(bytes);
       } catch (error) {
         console.error("Error loading NVD:", error);
       }

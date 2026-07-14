@@ -57,11 +57,16 @@ export type SaveVolumeState = {
   url: string;
 };
 
+/** On-disk niivue Document encoding chosen at save time. */
+export type NvdFormat = "json" | "cbor";
+
 export type SaveState = {
   isDownloadMode: boolean;
   document: {
     enabled: boolean;
     location: string;
+    /** JSON (FreeBrowse default) or binary CBOR (vanilla niivue-mono). */
+    format: NvdFormat;
   };
   volumes: SaveVolumeState[];
 };

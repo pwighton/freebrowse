@@ -118,6 +118,7 @@ export default function FreeBrowse() {
     handleVolumeCheckboxChange,
     handleDocumentLocationChange,
     handleDocumentCheckboxChange,
+    handleDocumentFormatChange,
   } = useSave(nvRef);
   const {
     serverlessMode,
@@ -221,6 +222,7 @@ export default function FreeBrowse() {
             onVolumeCheckboxChange={handleVolumeCheckboxChange}
             onDocumentLocationChange={handleDocumentLocationChange}
             onDocumentCheckboxChange={handleDocumentCheckboxChange}
+            onDocumentFormatChange={handleDocumentFormatChange}
           />
           <SettingsDialog nvRef={nvRef} />
           <ImagingUploadConfirmationDialog

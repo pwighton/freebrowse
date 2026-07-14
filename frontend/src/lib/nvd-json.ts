@@ -163,6 +163,25 @@ export function fromJsonSafe(value: unknown): unknown {
   return value;
 }
 
+/**
+ * Sniff whether raw `.nvd` bytes are FreeBrowse JSON or niivue-mono CBOR.
+ *
+ * FreeBrowse writes documents as a JSON object, whose first non-whitespace byte
+ * is always `{` (0x7B). niivue-mono's CBOR encoding never starts with `0x7B`
+ * (a CBOR map/array/tag major type is 0x80+). So the first non-whitespace byte
+ * unambiguously discriminates the two formats — the same rule proposed for
+ * niivue-mono's own `deserialize()` sniff (Phase 7). Returns `true` for JSON.
+ */
+export function sniffIsJson(bytes: Uint8Array): boolean {
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    // Skip ASCII whitespace: space, tab, LF, CR.
+    if (b === 0x20 || b === 0x09 || b === 0x0a || b === 0x0d) continue;
+    return b === 0x7b; // '{'
+  }
+  return false; // empty / all-whitespace → not JSON
+}
+
 /** Decode raw CBOR document bytes into a mutable document object. */
 export function decodeDocument(cborBytes: Uint8Array): Record<string, unknown> {
   return decode(cborBytes) as Record<string, unknown>;
