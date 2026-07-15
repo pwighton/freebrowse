@@ -158,111 +158,29 @@ def _scene_defaults():
     }
 
 
-def _layout_defaults():
-    return {
-        "sliceType": 3,  # MULTIPLANAR
-        "mosaicString": "",
-        "showRender": 2,  # SHOW_RENDER.AUTO
-        "multiplanarType": 0,  # MULTIPLANAR_TYPE.AUTO
-        "heroFraction": 0,
-        "heroSliceType": 4,  # SLICE_TYPE.RENDER
-        "isEqualSize": False,
-        "isMosaicCentered": True,
-        "margin": 0,
-        "isRadiological": False,
-        "customLayout": None,
-    }
-
-
-def _ui_defaults():
-    return {
-        "isColorbarVisible": False,
-        "isOrientCubeVisible": True,
-        "isOrientationTextVisible": True,
-        "is3DCrosshairVisible": True,
-        "isGraphVisible": False,
-        "isRulerVisible": False,
-        "isCrossLinesVisible": False,
-        "isLegendVisible": True,
-        "isPositionInMM": False,
-        "isMeasureUnitsVisible": True,
-        "isThumbnailVisible": False,
-        "thumbnailUrl": "",
-        "placeholderText": "No image loaded",
-        "crosshairColor": [1.0, 0, 0, 1.0],
-        "crosshairGap": 10,
-        "crosshairWidth": 1,
-        "fontColor": [0.5, 0.5, 0.5, 1],
-        "fontScale": 0.4,
-        "fontMinSize": 13,
-        "selectionBoxColor": [1, 1, 1, 0.5],
-        "measureLineColor": [1, 0, 0, 1],
-        "measureTextColor": [1, 0, 0, 1],
-        "rulerWidth": 2,
-        "graph": {
-            "normalizeValues": False,
-            "isRangeCalMinMax": False,
-            "showVolumeTimecourse": True,
-            "lineWidth": 1,
-            "lineAlpha": 1,
-            "autoResetView": True,
-        },
-    }
-
-
-def _volume_defaults():
-    return {
-        "illumination": 0.0,
-        "outlineWidth": 0,
-        "alphaShader": 1,
-        "isBackgroundMasking": False,
-        "isAlphaClipDark": False,
-        "isNearestInterpolation": False,
-        "isV1SliceShader": False,
-        "matcap": "",
-        "paqdUniforms": [0.01, 0.5, 0.25, 0.4],
-        "transmittanceCutoff": 0.95,
-    }
-
-
-def _mesh_defaults():
-    return {"xRay": 0, "thicknessOn2D": float("inf")}
-
-
-def _draw_defaults():
-    return {
-        "isEnabled": False,
-        "penValue": 1,
-        "penSize": 1,
-        "isFillOverwriting": True,
-        "opacity": 0.8,
-        "rimOpacity": -1,
-        "colormap": "_draw",
-    }
-
-
-def _interaction_defaults():
-    return {
-        "primaryDragMode": 8,  # DRAG_MODE.crosshair
-        "secondaryDragMode": 1,  # DRAG_MODE.contrast
-        "isSnapToVoxelCenters": False,
-        "isDragDropEnabled": True,
-        "isYoked3DTo2DZoom": False,
-    }
-
-
 def new_document_skeleton(created: str | None = None):
-    """A valid, empty NVDocumentData v8 (no volumes/meshes yet)."""
+    """A minimal, valid, empty NVDocumentData v8 (no volumes/meshes yet).
+
+    Only the fields niivue-mono's `deserialize` / `applyDocumentToModel` actually
+    require are emitted, keeping migrated docs close to the terse originals:
+      * `version`     — validated (must be a number <= 8).
+      * `scene`       — required, and every field is read individually (the color
+                        arrays are spread), so it must be COMPLETE.
+      * `layout`      — required only to be present/truthy; applied via
+                        `Object.assign`, so `{}` keeps the model's own defaults.
+      * `clipPlanes`  — iterated (`doc.clipPlanes.length`), so must exist.
+      * `volumes` / `meshes` — iterated by loadDocument, so must be arrays.
+    The `ui` / `volume` / `mesh` / `draw` / `interaction` groups are applied via
+    `Object.assign(model.X, doc.X)`, which ignores a missing source — so we omit
+    them entirely and the viewer falls back to its built-in defaults (identical
+    result, far smaller file). `created` is not read by niivue but is cheap,
+    conventional provenance, so we keep it.
+    """
     return {
         "version": DOCUMENT_VERSION,
         "created": created or datetime.now(timezone.utc).isoformat(),
         "scene": _scene_defaults(),
-        "layout": _layout_defaults(),
-        "ui": _ui_defaults(),
-        "volume": _volume_defaults(),
-        "mesh": _mesh_defaults(),
-        "draw": _draw_defaults(),
-        "interaction": _interaction_defaults(),
+        "layout": {},
         "clipPlanes": [],
         "volumes": [],
         "meshes": [],
