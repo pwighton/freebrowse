@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 import { useFreeBrowseStore } from "@/store";
 import {
   requestImagingUploadConfirmation,
@@ -35,7 +35,7 @@ async function fetchArrayBuffer(url: string): Promise<Uint8Array> {
 }
 
 async function exportAndUploadDrawing(
-  nv: Niivue,
+  nv: NiiVue,
   sessionName: string,
 ): Promise<string | null> {
   if (!nv.drawingVolume || nv.volumes.length === 0) return null;
@@ -104,7 +104,7 @@ const AI_PROMPT_COLORMAP = {
   labels: ["background", "positive", "negative"],
 };
 
-export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
+export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
   const aiEnabled = useFreeBrowseStore((s) => s.aiEnabled);
   const setAiSessions = useFreeBrowseStore((s) => s.setAiSessions);
   const setAiActiveSession = useFreeBrowseStore((s) => s.setAiActiveSession);
@@ -153,7 +153,13 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
       penValue,
     }));
     setActiveTab("aiAnnotation");
-  }, [nvRef, drawingOptions.penValue, drawingOptions.penFill, setDrawingOptions, setActiveTab]);
+  }, [
+    nvRef,
+    drawingOptions.penValue,
+    drawingOptions.penFill,
+    setDrawingOptions,
+    setActiveTab,
+  ]);
 
   const exitDrawModeLocal = useCallback(() => {
     const nv = nvRef.current;
@@ -210,7 +216,9 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
         // (was volume.saveToUint8Array(basename)).
         const raw = await nv.saveVolume({ filename: "", volumeByIndex: 0 });
         const uint8Array =
-          raw instanceof Uint8Array ? await gzipUint8Array(raw) : new Uint8Array();
+          raw instanceof Uint8Array
+            ? await gzipUint8Array(raw)
+            : new Uint8Array();
         const base64Data = uint8ArrayToBase64(uint8Array);
 
         const uploadRes = await fetch("/data/nii", {
@@ -297,7 +305,13 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
       });
       enterDrawMode();
     },
-    [nvRef, setShowUploader, incrementVolumeVersion, setAiActiveSession, enterDrawMode],
+    [
+      nvRef,
+      setShowUploader,
+      incrementVolumeVersion,
+      setAiActiveSession,
+      enterDrawMode,
+    ],
   );
 
   const handleRunSegmentation = useCallback(
@@ -308,8 +322,7 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
         throw new Error("No active session or volume");
 
       const annotRel = await exportAndUploadDrawing(nv, active.session_name);
-      if (!annotRel)
-        throw new Error("No drawing layer to send as annotations");
+      if (!annotRel) throw new Error("No drawing layer to send as annotations");
 
       await postSetAnnots(active.session_id, annotRel);
 
@@ -333,7 +346,10 @@ export function useAiSession(nvRef: React.RefObject<Niivue | null>) {
         const last = nv.volumes[lastIdx];
         const lastName = typeof last?.name === "string" ? last.name : "";
         const lastUrl = typeof last?.url === "string" ? last.url : "";
-        if (lastName === RESULT_FILENAME || lastUrl.includes(`/${RESULT_FILENAME}`)) {
+        if (
+          lastName === RESULT_FILENAME ||
+          lastUrl.includes(`/${RESULT_FILENAME}`)
+        ) {
           await nv.removeVolume(lastIdx); // was removeVolumeByIndex
         }
       }

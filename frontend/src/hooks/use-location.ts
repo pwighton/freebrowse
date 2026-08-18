@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 
-export function useLocation(nvRef: React.RefObject<Niivue | null>) {
+export function useLocation(nvRef: React.RefObject<NiiVue | null>) {
   const setLocationData = useFreeBrowseStore((s) => s.setLocationData);
 
   const handleLocationChange = useCallback(

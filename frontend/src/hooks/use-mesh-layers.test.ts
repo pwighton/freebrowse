@@ -1,16 +1,16 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
 import { useMeshLayers } from "./use-mesh-layers";
 
 type LayerRef = Parameters<typeof useMeshLayers>[0];
-const refOf = (nv: NiiVueGPU) => ({ current: nv }) as unknown as LayerRef;
+const refOf = (nv: NiiVue) => ({ current: nv }) as unknown as LayerRef;
 
 // A mesh (index 0) with one layer.
 function meshWithLayer() {
-  const nv = new NiiVueGPU();
+  const nv = new NiiVue();
   nv.meshes.push({ layers: [{ colormap: "gray", opacity: 0.5 }] });
   return nv;
 }
@@ -18,7 +18,7 @@ function meshWithLayer() {
 // useMeshLayers has a mount effect that resets selectedLayerIndex to null when
 // the surface changes, so the layer must be selected AFTER mount. currentSurface
 // is set before render (it survives the effect).
-function mount(nv: NiiVueGPU, { selectLayer = false } = {}) {
+function mount(nv: NiiVue, { selectLayer = false } = {}) {
   useFreeBrowseStore.setState({ currentSurfaceIndex: 0 });
   const hook = renderHook(() => useMeshLayers(refOf(nv)));
   if (selectLayer) {
@@ -96,7 +96,9 @@ describe("useMeshLayers — command dispatch", () => {
     await act(async () => {
       await result.current.handleLayerUseNegativeCmapChange(false);
     });
-    expect(spy).toHaveBeenNthCalledWith(1, 0, 0, { colormapNegative: "winter" });
+    expect(spy).toHaveBeenNthCalledWith(1, 0, 0, {
+      colormapNegative: "winter",
+    });
     expect(spy).toHaveBeenNthCalledWith(2, 0, 0, { colormapNegative: "" });
   });
 

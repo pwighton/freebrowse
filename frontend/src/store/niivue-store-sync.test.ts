@@ -1,16 +1,21 @@
 import { describe, expect, test } from "vitest";
 
-import { DRAG_MODE, NiiVueGPU, SHOW_RENDER, SLICE_TYPE } from "@/__mocks__/niivue.v2";
+import {
+  DRAG_MODE,
+  NiiVue,
+  SHOW_RENDER,
+  SLICE_TYPE,
+} from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
-import { registerNiivueEvents } from "./niivue-sync";
+import { registerNiiVueEvents } from "./niivue-sync";
 import { createStoreSyncTarget } from "./niivue-store-sync";
 
 // The adapter reads sliceType/showRender for viewMode; the v2 mock exposes them.
-type Reader = NiiVueGPU & { sliceType: number; showRender: number };
+type Reader = NiiVue & { sliceType: number; showRender: number };
 
 function wire() {
-  const nv = new NiiVueGPU() as Reader;
-  const teardown = registerNiivueEvents(nv, createStoreSyncTarget(nv));
+  const nv = new NiiVue() as Reader;
+  const teardown = registerNiiVueEvents(nv, createStoreSyncTarget(nv));
   return { nv, teardown };
 }
 
@@ -38,7 +43,9 @@ describe("createStoreSyncTarget — niivue events drive the store", () => {
     const { nv, teardown } = wire();
     const before = useFreeBrowseStore.getState().viewerOptions.crosshairWidth;
     nv.crosshairWidth = 0; // e.g. hidden — must not clobber the remembered width
-    expect(useFreeBrowseStore.getState().viewerOptions.crosshairWidth).toBe(before);
+    expect(useFreeBrowseStore.getState().viewerOptions.crosshairWidth).toBe(
+      before,
+    );
     teardown();
   });
 

@@ -27,7 +27,7 @@ export const SHOW_RENDER = {
   AUTO: 2,
 } as const;
 
-export function createMockNiivue() {
+export function createMockNiiVue() {
   return {
     attachToCanvas: vi.fn(() => Promise.resolve()),
     addVolumeFromUrl: vi.fn((opts: { url: string }) =>
@@ -85,17 +85,17 @@ export function createMockNiivue() {
   };
 }
 
-export const mockInstances: ReturnType<typeof createMockNiivue>[] = [];
+export const mockInstances: ReturnType<typeof createMockNiiVue>[] = [];
 
 export function clearMockInstances(): void {
   mockInstances.length = 0;
 }
 
-export class Niivue {
+export class NiiVue {
   [key: string]: unknown;
 
   constructor(_opts?: unknown) {
-    const instance = createMockNiivue();
+    const instance = createMockNiiVue();
     Object.assign(this, instance);
     mockInstances.push(instance);
   }

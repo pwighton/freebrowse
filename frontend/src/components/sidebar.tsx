@@ -1,14 +1,8 @@
 import { useFreeBrowseStore } from "@/store";
-import {
-  FileText,
-  Box,
-  Brain,
-  Database,
-  Pencil,
-} from "lucide-react";
+import { FileText, Box, Brain, Database, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 import NvdTab from "@/components/tabs/nvd-tab";
 import DataTab from "@/components/tabs/data-tab";
@@ -19,7 +13,7 @@ import AiAnnotationTab from "@/components/tabs/ai-annotation-tab";
 import { Sparkles } from "lucide-react";
 
 interface SidebarProps {
-  nvRef: React.RefObject<Niivue | null>;
+  nvRef: React.RefObject<NiiVue | null>;
   serverlessMode: boolean;
   // File loading
   onNvdFileSelect: (file: FileItem) => void;
@@ -57,7 +51,9 @@ interface SidebarProps {
   // Drawing operations
   onCreateDrawingLayer: () => void;
   onDrawModeChange: (mode: "none" | "pen" | "wand") => void;
-  onDrawingColormapChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  onDrawingColormapChange: (
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) => void;
   onPenFillChange: (checked: boolean) => void;
   onPenErasesChange: (checked: boolean) => void;
   onPenValueChange: (value: number) => void;
@@ -128,18 +124,12 @@ export default function Sidebar(props: SidebarProps) {
             </TabsTrigger>
           )}
           {!props.serverlessMode && (
-            <TabsTrigger
-              value="nvds"
-              className="data-[state=active]:bg-muted"
-            >
+            <TabsTrigger value="nvds" className="data-[state=active]:bg-muted">
               <FileText className="h-4 w-4 mr-2" />
             </TabsTrigger>
           )}
           {!props.serverlessMode && (
-            <TabsTrigger
-              value="data"
-              className="data-[state=active]:bg-muted"
-            >
+            <TabsTrigger value="data" className="data-[state=active]:bg-muted">
               <Database className="h-4 w-4 mr-2" />
             </TabsTrigger>
           )}

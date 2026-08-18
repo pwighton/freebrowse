@@ -3,7 +3,7 @@ import { magicWand, type MagicWandOptions } from "@niivue/nv-ext-drawing";
 import type {
   BackgroundVolumeAccess,
   DrawingChangedDetail,
-  NiiVueGPU as Niivue,
+  NiiVue as NiiVue,
   NVExtensionContext,
   SlicePointerEvent,
 } from "@niivue/niivue";
@@ -82,7 +82,7 @@ export async function runMagicWand(
  * instance; params are read imperatively at event time (so changing them never
  * re-subscribes).
  */
-export function useMagicWand(nvRef: React.RefObject<Niivue | null>): void {
+export function useMagicWand(nvRef: React.RefObject<NiiVue | null>): void {
   // Snapshot of the drawing bitmap before the active preview (null = no active
   // preview; the live drawing bitmap is the truth). Flood base for previews.
   const committedRef = useRef<Uint8Array | null>(null);
@@ -142,7 +142,10 @@ export function useMagicWand(nvRef: React.RefObject<Niivue | null>): void {
     const onMove = (e: CustomEvent<SlicePointerEvent>): void => {
       if (opts().mode !== "wand") return;
       if (!ctx.drawing || !ctx.backgroundVolume?.imgRAS) return;
-      pendingRef.current = { seed: e.detail.voxel, sliceType: e.detail.sliceType };
+      pendingRef.current = {
+        seed: e.detail.voxel,
+        sliceType: e.detail.sliceType,
+      };
       pump();
     };
 
@@ -167,11 +170,14 @@ export function useMagicWand(nvRef: React.RefObject<Niivue | null>): void {
       } else if (!busyRef.current) {
         // No hover preview happened (e.g. a bare click) — one-shot commit.
         busyRef.current = true;
-        void runMagicWand(ctx, opts(), e.detail.voxel, e.detail.sliceType).finally(
-          () => {
-            busyRef.current = false;
-          },
-        );
+        void runMagicWand(
+          ctx,
+          opts(),
+          e.detail.voxel,
+          e.detail.sliceType,
+        ).finally(() => {
+          busyRef.current = false;
+        });
       }
     };
 
