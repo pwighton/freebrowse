@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 vi.mock("@niivue/nv-ext-drawing", () => ({ magicWand: vi.fn() }));
 
 import { magicWand } from "@niivue/nv-ext-drawing";
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
 import type { DrawingOptions } from "@/store/types";
 import { runMagicWand, useMagicWand } from "./use-magic-wand";
@@ -15,7 +15,12 @@ const mockedMagicWand = vi.mocked(magicWand);
 
 const wandResult = (bitmap: Uint8Array) => ({
   bitmap,
-  result: { filledCount: 0, seedIntensity: 0, intensityMin: 0, intensityMax: 0 },
+  result: {
+    filledCount: 0,
+    seedIntensity: 0,
+    intensityMin: 0,
+    intensityMax: 0,
+  },
 });
 
 const DEFAULT: DrawingOptions = {
@@ -112,9 +117,9 @@ describe("runMagicWand — orchestration", () => {
 
 describe("useMagicWand — slicePointerUp wiring", () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const refOf = (nv: NiiVueGPU) => ({ current: nv }) as any;
+  const refOf = (nv: NiiVue) => ({ current: nv }) as any;
 
-  const emitClick = async (nv: NiiVueGPU, voxel: number[], sliceType: number) =>
+  const emitClick = async (nv: NiiVue, voxel: number[], sliceType: number) =>
     act(async () => {
       nv.emit("slicePointerUp", { voxel, sliceType });
       await Promise.resolve();
@@ -127,7 +132,7 @@ describe("useMagicWand — slicePointerUp wiring", () => {
   });
 
   test("wand mode: a slice click seeds magicWand with the clicked voxel/axis", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     nv.createEmptyDrawing();
     renderHook(() => useMagicWand(refOf(nv)));
@@ -143,7 +148,7 @@ describe("useMagicWand — slicePointerUp wiring", () => {
     useFreeBrowseStore.setState({
       drawingOptions: { ...DEFAULT, mode: "pen" },
     });
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     nv.createEmptyDrawing();
     renderHook(() => useMagicWand(refOf(nv)));
@@ -153,7 +158,7 @@ describe("useMagicWand — slicePointerUp wiring", () => {
   });
 
   test("no drawing layer: click is ignored", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" }); // volume present, but no drawing layer
     renderHook(() => useMagicWand(refOf(nv)));
 
@@ -162,7 +167,7 @@ describe("useMagicWand — slicePointerUp wiring", () => {
   });
 
   test("teardown removes the subscription", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     nv.createEmptyDrawing();
     const { unmount } = renderHook(() => useMagicWand(refOf(nv)));
@@ -175,17 +180,17 @@ describe("useMagicWand — slicePointerUp wiring", () => {
 
 describe("useMagicWand — hover preview (4c.2)", () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const refOf = (nv: NiiVueGPU) => ({ current: nv }) as any;
+  const refOf = (nv: NiiVue) => ({ current: nv }) as any;
 
-  const move = (nv: NiiVueGPU, voxel: number[], sliceType = 0) =>
+  const move = (nv: NiiVue, voxel: number[], sliceType = 0) =>
     act(async () => {
       nv.emit("slicePointerMove", { voxel, sliceType });
       await Promise.resolve();
     });
 
   /** A ready-to-draw instance: one volume + an active drawing layer, wired. */
-  function ready(): NiiVueGPU {
-    const nv = new NiiVueGPU();
+  function ready(): NiiVue {
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     nv.createEmptyDrawing();
     renderHook(() => useMagicWand(refOf(nv)));
@@ -213,9 +218,7 @@ describe("useMagicWand — hover preview (4c.2)", () => {
       nv.emit("slicePointerMove", { voxel: [1, 1, 1], sliceType: 0 });
       nv.emit("slicePointerMove", { voxel: [2, 2, 2], sliceType: 0 });
     });
-    await vi.waitFor(() =>
-      expect(mockedMagicWand).toHaveBeenCalledTimes(2),
-    );
+    await vi.waitFor(() => expect(mockedMagicWand).toHaveBeenCalledTimes(2));
     // The committed base (drawBitmap arg) is the drawing bitmap (length 8) on
     // BOTH calls — never the length-1 preview the first call returned.
     expect(mockedMagicWand.mock.calls[0][1]).toHaveLength(8);

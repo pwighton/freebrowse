@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 
 /**
  * Built-in colormaps that are categorical/label maps (as opposed to continuous
@@ -14,7 +14,7 @@ import type { NiiVueGPU as Niivue } from "@niivue/niivue";
 const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256"]);
 
 export function useVolumes(
-  nvRef: React.RefObject<Niivue | null>,
+  nvRef: React.RefObject<NiiVue | null>,
   debouncedGLUpdate: () => void,
   removeSurface: (surfaceIndex: number) => void,
 ) {
@@ -23,12 +23,18 @@ export function useVolumes(
   // longer needed here; kept in the signature for call-site stability.
   void debouncedGLUpdate;
   const currentImageIndex = useFreeBrowseStore((s) => s.currentImageIndex);
-  const setCurrentImageIndex = useFreeBrowseStore((s) => s.setCurrentImageIndex);
+  const setCurrentImageIndex = useFreeBrowseStore(
+    (s) => s.setCurrentImageIndex,
+  );
   const volumeVersion = useFreeBrowseStore((s) => s.volumeVersion);
-  const incrementVolumeVersion = useFreeBrowseStore((s) => s.incrementVolumeVersion);
+  const incrementVolumeVersion = useFreeBrowseStore(
+    (s) => s.incrementVolumeVersion,
+  );
   const volumeToRemove = useFreeBrowseStore((s) => s.volumeToRemove);
   const setVolumeToRemove = useFreeBrowseStore((s) => s.setVolumeToRemove);
-  const skipRemoveConfirmation = useFreeBrowseStore((s) => s.skipRemoveConfirmation);
+  const skipRemoveConfirmation = useFreeBrowseStore(
+    (s) => s.skipRemoveConfirmation,
+  );
   const setRemoveDialogOpen = useFreeBrowseStore((s) => s.setRemoveDialogOpen);
   const surfaceToRemove = useFreeBrowseStore((s) => s.surfaceToRemove);
   const setSurfaceToRemove = useFreeBrowseStore((s) => s.setSurfaceToRemove);
@@ -54,7 +60,7 @@ export function useVolumes(
       const volume = nv.volumes[volumeIndex];
       const opacity = volume.opacity ?? 1.0;
       const isCurrentlyVisible = opacity > 0;
-      const newOpacity = isCurrentlyVisible ? 0 : (opacity === 0 ? 1.0 : opacity);
+      const newOpacity = isCurrentlyVisible ? 0 : opacity === 0 ? 1.0 : opacity;
 
       void nv.setVolume(volumeIndex, { opacity: newOpacity });
       incrementVolumeVersion();
@@ -65,7 +71,8 @@ export function useVolumes(
   const handleOpacityChange = useCallback(
     (newOpacity: number) => {
       const nv = nvRef.current;
-      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+        return;
       void nv.setVolume(currentImageIndex, { opacity: newOpacity });
       incrementVolumeVersion();
     },
@@ -75,7 +82,8 @@ export function useVolumes(
   const handleFrameChange = useCallback(
     (newFrame: number) => {
       const nv = nvRef.current;
-      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+        return;
       const id = nv.volumes[currentImageIndex].id;
       if (!id) return;
       void nv.setFrame4D(id, newFrame);
@@ -87,7 +95,8 @@ export function useVolumes(
   const handleContrastMinChange = useCallback(
     (newContrastMin: number) => {
       const nv = nvRef.current;
-      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+        return;
       // setVolume emits volumeUpdated -> the store follows via the event adapter.
       void nv.setVolume(currentImageIndex, { calMin: newContrastMin });
     },
@@ -97,7 +106,8 @@ export function useVolumes(
   const handleContrastMaxChange = useCallback(
     (newContrastMax: number) => {
       const nv = nvRef.current;
-      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+        return;
       void nv.setVolume(currentImageIndex, { calMax: newContrastMax });
     },
     [currentImageIndex, nvRef],
@@ -107,7 +117,8 @@ export function useVolumes(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
       const newColormap = event.target.value;
       const nv = nvRef.current;
-      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+      if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+        return;
       // Always set the continuous colormap (so the dropdown value derives from
       // volume.colormap and round-trips through the document). If the chosen
       // colormap is categorical, ALSO attach it as a label colormap so the
@@ -125,7 +136,8 @@ export function useVolumes(
 
   const handleMoveVolumeUp = useCallback(() => {
     const nv = nvRef.current;
-    if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+    if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+      return;
     if (currentImageIndex === 0) return; // already first in the list
     // UI "up" means earlier in the list (lower index); niivue's moveVolumeDown
     // decreases the array index.
@@ -136,7 +148,8 @@ export function useVolumes(
 
   const handleMoveVolumeDown = useCallback(() => {
     const nv = nvRef.current;
-    if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex]) return;
+    if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
+      return;
     if (currentImageIndex >= nv.volumes.length - 1) return; // already last in the list
     // UI "down" means later in the list (higher index); niivue's moveVolumeUp
     // increases the array index.
@@ -160,10 +173,7 @@ export function useVolumes(
         } else {
           setCurrentImageIndex(null);
         }
-      } else if (
-        currentImageIndex !== null &&
-        currentImageIndex > imageIndex
-      ) {
+      } else if (currentImageIndex !== null && currentImageIndex > imageIndex) {
         setCurrentImageIndex(currentImageIndex - 1);
       }
     },
@@ -179,7 +189,12 @@ export function useVolumes(
         setRemoveDialogOpen(true);
       }
     },
-    [skipRemoveConfirmation, removeVolume, setVolumeToRemove, setRemoveDialogOpen],
+    [
+      skipRemoveConfirmation,
+      removeVolume,
+      setVolumeToRemove,
+      setRemoveDialogOpen,
+    ],
   );
 
   const handleEditVolume = useCallback(
@@ -190,14 +205,19 @@ export function useVolumes(
       // Carry the volume's colormap onto the drawing so it looks the same as an
       // editable layer (inverse of save-drawing). Captured before removal.
       const cmap = volume.colormap as string | undefined;
-      const name = ((volume.name as string) || "edit.nii").replace(/\.gz$/i, "");
+      const name = ((volume.name as string) || "edit.nii").replace(
+        /\.gz$/i,
+        "",
+      );
       // Export the volume's voxels (uint8 — canEditVolume gates this) as raw bytes.
       const bytes = (await nv.saveVolume({
         filename: "",
         volumeByIndex: imageIndex,
       })) as Uint8Array;
       if (!(bytes instanceof Uint8Array)) return;
-      const file = new File([bytes], name, { type: "application/octet-stream" });
+      const file = new File([bytes], name, {
+        type: "application/octet-stream",
+      });
 
       // The volume becomes the editable drawing.
       await nv.removeVolume(imageIndex);
@@ -289,7 +309,15 @@ export function useVolumes(
     setRemoveDialogOpen(false);
     setVolumeToRemove(null);
     setSurfaceToRemove(null);
-  }, [volumeToRemove, removeVolume, surfaceToRemove, removeSurface, setRemoveDialogOpen, setVolumeToRemove, setSurfaceToRemove]);
+  }, [
+    volumeToRemove,
+    removeVolume,
+    surfaceToRemove,
+    removeSurface,
+    setRemoveDialogOpen,
+    setVolumeToRemove,
+    setSurfaceToRemove,
+  ]);
 
   const handleCancelRemove = useCallback(() => {
     setRemoveDialogOpen(false);

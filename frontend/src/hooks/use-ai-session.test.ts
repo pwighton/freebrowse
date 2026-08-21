@@ -7,13 +7,13 @@ vi.mock("@/lib/confirmations", () => ({
   requestSessionDeleteConfirmation: vi.fn(async () => true),
 }));
 
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
 import type { AiSessionSummary } from "@/store/ai-slice";
 import { useAiSession } from "./use-ai-session";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const refOf = (nv: NiiVueGPU) => ({ current: nv }) as any;
+const refOf = (nv: NiiVue) => ({ current: nv }) as any;
 
 type Call = { url: string; method: string; body: unknown };
 let calls: Call[] = [];
@@ -70,7 +70,7 @@ beforeEach(() => {
 
 describe("useAiSession — handleNewSession (volume already on backend)", () => {
   test("creates a session, sets the volume, and enters draw mode", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", url: "/data/foo.nii.gz", name: "foo" });
     const { result } = renderHook(() => useAiSession(refOf(nv)));
 
@@ -97,7 +97,7 @@ describe("useAiSession — handleNewSession (volume already on backend)", () => 
 
 describe("useAiSession — handleRunSegmentation", () => {
   test("uploads annotations, infers, and loads the result overlay", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", url: "/data/foo.nii.gz", name: "foo" });
     nv.createEmptyDrawing(); // prompts drawn → a drawing layer exists
     useFreeBrowseStore.setState({
@@ -133,7 +133,7 @@ describe("useAiSession — handleRunSegmentation", () => {
   });
 
   test("throws when there is no drawing layer to send", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", url: "/data/foo.nii.gz", name: "foo" });
     useFreeBrowseStore.setState({
       aiActiveSession: { session_id: "s1", session_name: "test" },
@@ -160,7 +160,7 @@ describe("useAiSession — handleLoadSession", () => {
       last_inference_at: null,
     };
     useFreeBrowseStore.setState({ aiSessions: [summary] });
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const loadDrawing = vi.spyOn(nv, "loadDrawing");
     const { result } = renderHook(() => useAiSession(refOf(nv)));
 
@@ -179,7 +179,7 @@ describe("useAiSession — handleLoadSession", () => {
 
 describe("useAiSession — exit", () => {
   test("save-and-exit uploads annotations then tears down the drawing", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", url: "/data/foo.nii.gz", name: "foo" });
     nv.createEmptyDrawing();
     useFreeBrowseStore.setState({

@@ -4,13 +4,13 @@ import { sliceTypeMap } from "@/lib/niivue-helpers";
 import { useFreeBrowseStore } from "@/store";
 import type { DragMode } from "@/components/drag-mode-selector";
 import type { ViewMode } from "@/store/types";
-import type { NiivueEventSource, NiivueSyncTarget } from "./niivue-sync";
+import type { NiiVueEventSource, NiiVueSyncTarget } from "./niivue-sync";
 
 /**
- * Concrete NiivueSyncTarget backed by the FreeBrowse Zustand store.
+ * Concrete NiiVueSyncTarget backed by the FreeBrowse Zustand store.
  *
  * This is the adapter that makes the store a *derived view* of niivue state:
- * `registerNiivueEvents(nv, createStoreSyncTarget(nv))` routes every relevant
+ * `registerNiiVueEvents(nv, createStoreSyncTarget(nv))` routes every relevant
  * niivue event into the store, translating niivue-mono property names/values
  * into FreeBrowse's store shape. Because both FreeBrowse's own command wrappers
  * and external callers (e.g. `window.freebrowse.nv`) drive niivue through the
@@ -23,7 +23,7 @@ import type { NiivueEventSource, NiivueSyncTarget } from "./niivue-sync";
  */
 
 /** niivue reader surface this adapter needs beyond the event target. */
-type NiivueReader = NiivueEventSource & {
+type NiiVueReader = NiiVueEventSource & {
   sliceType: number;
   showRender: number;
 };
@@ -54,10 +54,11 @@ function dragModeName(value: unknown): DragMode {
   return (match?.[0] as DragMode) ?? "contrast";
 }
 
-function viewModeFromNiivue(nv: NiivueReader): ViewMode {
+function viewModeFromNiiVue(nv: NiiVueReader): ViewMode {
   // ACS vs ACSR differ only by showRender, so match on both.
   const exact = Object.entries(sliceTypeMap).find(
-    ([, cfg]) => cfg.sliceType === nv.sliceType && cfg.showRender === nv.showRender,
+    ([, cfg]) =>
+      cfg.sliceType === nv.sliceType && cfg.showRender === nv.showRender,
   );
   if (exact) return exact[0] as ViewMode;
   const bySlice = Object.entries(sliceTypeMap).find(
@@ -66,7 +67,7 @@ function viewModeFromNiivue(nv: NiivueReader): ViewMode {
   return (bySlice?.[0] as ViewMode) ?? "ACS";
 }
 
-export function createStoreSyncTarget(nv: NiivueReader): NiivueSyncTarget {
+export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
   const store = () => useFreeBrowseStore.getState();
   const patchViewer = (partial: Record<string, unknown>) =>
     store().setViewerOptions((prev) => ({ ...prev, ...partial }));
@@ -110,7 +111,7 @@ export function createStoreSyncTarget(nv: NiivueReader): NiivueSyncTarget {
           break;
         case "sliceType":
         case "showRender":
-          patchViewer({ viewMode: viewModeFromNiivue(nv) });
+          patchViewer({ viewMode: viewModeFromNiiVue(nv) });
           break;
         default:
           break;
@@ -125,10 +126,16 @@ export function createStoreSyncTarget(nv: NiivueReader): NiivueSyncTarget {
       const s = store();
       switch (property) {
         case "drawOpacity":
-          s.setDrawingOptions((prev) => ({ ...prev, opacity: value as number }));
+          s.setDrawingOptions((prev) => ({
+            ...prev,
+            opacity: value as number,
+          }));
           break;
         case "drawColormap":
-          s.setDrawingOptions((prev) => ({ ...prev, colormap: value as string }));
+          s.setDrawingOptions((prev) => ({
+            ...prev,
+            colormap: value as string,
+          }));
           break;
         default:
           break;

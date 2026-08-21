@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { type NiiVueGPU as Niivue } from "@niivue/niivue";
+import NiiVue from "@niivue/niivue";
 
 /**
  * Mesh scalar-overlay layer handlers. Command-only: handlers issue nv.* layer
@@ -9,10 +9,12 @@ import { type NiiVueGPU as Niivue } from "@niivue/niivue";
  * nv.meshes[i].layers at render, so the UI follows without imperative writes.
  * Layers are addressed by (meshIndex, layerIndex) — niivue-mono meshes have no id.
  */
-export function useMeshLayers(nvRef: React.RefObject<Niivue | null>) {
+export function useMeshLayers(nvRef: React.RefObject<NiiVue | null>) {
   const currentSurfaceIndex = useFreeBrowseStore((s) => s.currentSurfaceIndex);
   const selectedLayerIndex = useFreeBrowseStore((s) => s.selectedLayerIndex);
-  const setSelectedLayerIndex = useFreeBrowseStore((s) => s.setSelectedLayerIndex);
+  const setSelectedLayerIndex = useFreeBrowseStore(
+    (s) => s.setSelectedLayerIndex,
+  );
   const layerVersion = useFreeBrowseStore((s) => s.layerVersion);
 
   const layerFileInputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +37,11 @@ export function useMeshLayers(nvRef: React.RefObject<Niivue | null>) {
   const addLayerFromFile = useCallback(
     async (file: File) => {
       const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || !nv.meshes[currentSurfaceIndex])
+      if (
+        !nv ||
+        currentSurfaceIndex === null ||
+        !nv.meshes[currentSurfaceIndex]
+      )
         return;
       // niivue-mono loads layers by URL/File and now persists the layer name
       // (PR: URL mesh layers). The old NVMesh.loadLayer + name backfill is gone.
@@ -54,13 +60,20 @@ export function useMeshLayers(nvRef: React.RefObject<Niivue | null>) {
   const removeLayer = useCallback(
     (layerIndex: number) => {
       const nv = nvRef.current;
-      if (!nv || currentSurfaceIndex === null || !nv.meshes[currentSurfaceIndex])
+      if (
+        !nv ||
+        currentSurfaceIndex === null ||
+        !nv.meshes[currentSurfaceIndex]
+      )
         return;
       void nv.removeMeshLayer(currentSurfaceIndex, layerIndex);
 
       if (selectedLayerIndex === layerIndex) {
         setSelectedLayerIndex(null);
-      } else if (selectedLayerIndex !== null && selectedLayerIndex > layerIndex) {
+      } else if (
+        selectedLayerIndex !== null &&
+        selectedLayerIndex > layerIndex
+      ) {
         setSelectedLayerIndex(selectedLayerIndex - 1);
       }
     },
@@ -78,7 +91,11 @@ export function useMeshLayers(nvRef: React.RefObject<Niivue | null>) {
         !nv.meshes[currentSurfaceIndex]
       )
         return;
-      void nv.setMeshLayerProperty(currentSurfaceIndex, selectedLayerIndex, options);
+      void nv.setMeshLayerProperty(
+        currentSurfaceIndex,
+        selectedLayerIndex,
+        options,
+      );
     },
     [nvRef, currentSurfaceIndex, selectedLayerIndex],
   );

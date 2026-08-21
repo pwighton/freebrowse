@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 import type { ViewMode } from "@/store/types";
 import Header from "./header";
 import Footer from "./footer";
 import CanvasArea from "./canvas-area";
 
 interface ViewerShellProps {
-  nvInstance: Niivue;
+  nvInstance: NiiVue;
   viewMode: ViewMode;
   onFileUpload: (files: File[]) => Promise<void>;
   sidebar?: React.ReactNode;
@@ -29,7 +29,7 @@ export default function ViewerShell({
   const footerOpen = useFreeBrowseStore((s) => s.footerOpen);
   const darkMode = useFreeBrowseStore((s) => s.darkMode);
 
-  const nvRef = useRef<Niivue | null>(nvInstance);
+  const nvRef = useRef<NiiVue | null>(nvInstance);
 
   useEffect(() => {
     if (darkMode) {

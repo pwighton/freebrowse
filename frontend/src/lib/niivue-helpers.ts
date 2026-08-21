@@ -1,7 +1,7 @@
 import { SHOW_RENDER } from "@niivue/niivue";
 
 /**
- * Map from view mode name to Niivue slice type and render settings.
+ * Map from view mode name to NiiVue slice type and render settings.
  */
 export const sliceTypeMap: {
   [type: string]: { sliceType: number; showRender: number };

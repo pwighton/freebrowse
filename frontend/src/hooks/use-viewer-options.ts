@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
 import { sliceTypeMap } from "@/lib/niivue-helpers";
-import { DRAG_MODE, type NiiVueGPU as Niivue } from "@niivue/niivue";
+import { DRAG_MODE, type NiiVue as NiiVue } from "@niivue/niivue";
 import type { DragMode } from "@/components/drag-mode-selector";
 import type { ViewMode } from "@/store/types";
 
 /**
  * Viewer-option handlers. Event-driven model: handlers issue commands to the
  * niivue instance (`nv.*`) and the Zustand store follows via the event adapter
- * (registerNiivueEvents / createStoreSyncTarget) — handlers do NOT write the
+ * (registerNiiVueEvents / createStoreSyncTarget) — handlers do NOT write the
  * store themselves. The single exception is crosshairWidth/crosshairVisible,
  * which is store-owned UI state (niivue has only one crosshairWidth where 0
  * means hidden, so it can't remember the width while hidden).
  */
 export function useViewerOptions(
-  nvRef: React.RefObject<Niivue | null>,
+  nvRef: React.RefObject<NiiVue | null>,
   autoApply = false,
 ) {
   const viewerOptions = useFreeBrowseStore((s) => s.viewerOptions);
@@ -67,7 +67,7 @@ export function useViewerOptions(
 
   // Replaced by the event adapter; kept as a no-op for signature stability
   // (still passed into use-file-loading).
-  const syncViewerOptionsFromNiivue = useCallback(() => {}, []);
+  const syncViewerOptionsFromNiiVue = useCallback(() => {}, []);
 
   // One-time init: seed the instance from store defaults on mount.
   const didInit = useRef(false);
@@ -213,7 +213,7 @@ export function useViewerOptions(
     viewerOptions,
     setViewerOptions,
     applyViewerOptions,
-    syncViewerOptionsFromNiivue,
+    syncViewerOptionsFromNiiVue,
     debouncedGLUpdate,
     handleViewMode,
     handleDragModeChange,
