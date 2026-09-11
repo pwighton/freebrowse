@@ -1,3 +1,5 @@
+import type { SerializeOptions } from "@niivue/niivue";
+
 import type { DragMode } from "@/components/drag-mode-selector";
 
 export type SurfaceDetails = {
@@ -57,15 +59,20 @@ export type SaveVolumeState = {
   url: string;
 };
 
-/** On-disk niivue Document encoding chosen at save time. */
-export type NvdFormat = "json" | "cbor";
+/**
+ * On-disk niivue Document encoding chosen at save time. Derived from niivue's
+ * own option type so a future upstream format is a compile error at the save
+ * dialog rather than a silent divergence.
+ */
+export type NvdFormat = NonNullable<SerializeOptions["format"]>;
 
 export type SaveState = {
   isDownloadMode: boolean;
   document: {
     enabled: boolean;
     location: string;
-    /** JSON (FreeBrowse default) or binary CBOR (vanilla niivue-mono). */
+    /** Both are native niivue encodings: JSON is portable and diffable,
+     * CBOR is the compact binary default. */
     format: NvdFormat;
   };
   volumes: SaveVolumeState[];

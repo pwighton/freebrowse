@@ -1,8 +1,45 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { jsonToDocumentFile, sniffIsJson } from "@/lib/nvd-json";
 import type { NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
+
+const LEGACY_NVD_MESSAGE =
+  "This .nvd predates the niivue document schema (it has `imageOptionsArray` " +
+  "and no `version`). Regenerate it with scripts/migrate-nvd.py.";
+
+/**
+ * Fail legibly on a pre-niivue-mono `.nvd` instead of letting niivue report the
+ * opaque "Invalid NVD file: missing version".
+ *
+ * Legacy documents are old niivue's `DocumentData`/`ExportDocumentData` shape
+ * (`imageOptionsArray`, `encodedImageBlobs`, `meshesString`, …) plus
+ * FreeBrowse's own top-level `meshes` array. niivue's `deserialize` rejects them
+ * outright because they carry no `version`.
+ *
+ * Best-effort by design: for raw bytes this scans a bounded prefix rather than
+ * parsing a document that may be hundreds of MB. A miss just means the user gets
+ * niivue's original error, so this never needs to be exhaustive.
+ */
+function assertNotLegacyDocument(
+  data: Uint8Array | Record<string, unknown>,
+): void {
+  if (data instanceof Uint8Array) {
+    // Only JSON can be legacy; CBOR documents are always versioned.
+    const first = data.find(
+      (b) => b !== 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d,
+    );
+    if (first !== 0x7b) return; // not '{'
+    const prefix = new TextDecoder("utf-8", { fatal: false }).decode(
+      data.subarray(0, 64 * 1024),
+    );
+    if (prefix.includes('"imageOptionsArray"') && !prefix.includes('"version"'))
+      throw new Error(LEGACY_NVD_MESSAGE);
+    return;
+  }
+  if ("imageOptionsArray" in data && typeof data.version !== "number") {
+    throw new Error(LEGACY_NVD_MESSAGE);
+  }
+}
 
 export function useFileLoading(
   nvRef: React.RefObject<NiiVue | null>,
@@ -34,11 +71,10 @@ export function useFileLoading(
   // Load a niivue Document (.nvd) into the scene.
   //
   // Accepts either raw bytes (from a file upload / server fetch) or an
-  // already-parsed JSON object (the embedded single-file path). Bytes are
-  // format-sniffed: a leading `{` is FreeBrowse JSON (decoded via the
-  // nvd-json.ts JSON<->CBOR adapter), anything else is niivue-mono CBOR (passed
-  // straight through). Both converge on `nv.loadDocument(File)`; the store then
-  // follows via documentLoaded/volumeLoaded/meshLoaded (niivue-store-sync).
+  // already-parsed JSON object (the embedded single-file path). niivue sniffs
+  // JSON vs CBOR itself (NVDocument.deserialize -> looksLikeJSON), so both
+  // encodings pass through unchanged and FreeBrowse no longer transcodes. The
+  // store follows via documentLoaded/volumeLoaded/meshLoaded (niivue-store-sync).
   const loadNvdData = useCallback(
     async (data: ArrayBuffer | Uint8Array | Record<string, unknown>) => {
       const nv = nvRef.current;
@@ -49,15 +85,18 @@ export function useFileLoading(
       let file: File;
       if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-        if (sniffIsJson(bytes)) {
-          const json = JSON.parse(new TextDecoder().decode(bytes));
-          file = jsonToDocumentFile(json);
-        } else {
-          file = new File([bytes], "scene.nvd", { type: "application/cbor" });
-        }
+        assertNotLegacyDocument(bytes);
+        file = new File([bytes], "scene.nvd", {
+          type: "application/octet-stream",
+        });
       } else {
         // Already-parsed JSON object (embedded __EMBEDDED_NVD_DATA__ path).
-        file = jsonToDocumentFile(data);
+        // Re-stringify: lossless, since it came from JSON text and so holds no
+        // typed arrays and no non-finite numbers.
+        assertNotLegacyDocument(data);
+        file = new File([JSON.stringify(data)], "scene.nvd", {
+          type: "application/json",
+        });
       }
 
       await nv.loadDocument(file);

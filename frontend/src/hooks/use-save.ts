@@ -1,13 +1,7 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
 import { gzipUint8Array, uint8ArrayToBase64 } from "@/lib/niivue-helpers";
-import {
-  decodeDocument,
-  documentToJson,
-  stripEmbeddedData,
-  toJsonSafe,
-  encodeDocument,
-} from "@/lib/nvd-json";
+import { retargetVolumeUrls } from "@/lib/nvd-volume-urls";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
 import type { NvdFormat } from "@/store/types";
 import type { NiiVue } from "@niivue/niivue";
@@ -79,16 +73,15 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
       if (saveState.document.enabled && saveState.document.location.trim()) {
         try {
           const filename = ensureExt(saveState.document.location.trim(), ".nvd");
-          const cbor = nvRef.current.serializeDocument();
-          if (saveState.document.format === "cbor") {
-            // Binary CBOR (vanilla niivue-mono / ipyniivue).
-            downloadBytes(cbor, filename, "application/cbor");
-          } else {
-            // FreeBrowse JSON (lossless via the tagged adapter). Embeds
-            // everything, including meshes.
-            const json = JSON.stringify(documentToJson(cbor));
-            downloadBytes(json, filename, "application/json");
-          }
+          const format = saveState.document.format;
+          // niivue serializes both encodings natively; `loadDocument` sniffs
+          // them apart on the way back in. Embeds everything, meshes included.
+          const bytes = nvRef.current.serializeDocument({ format });
+          downloadBytes(
+            bytes,
+            filename,
+            format === "json" ? "application/json" : "application/cbor",
+          );
         } catch (error) {
           console.error("Error downloading document:", error);
         }
@@ -130,19 +123,37 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
         try {
           // Point each volume entry at its backend save URL, and drop embedded
           // volume data (the backend stores volumes separately, below).
+          //
+          // `linkData: true` is load-bearing: without it niivue embeds every
+          // volume's bytes into the document only for us to delete them, which
+          // on the JSON path means base64-ing the whole volume first.
           const volumeUrls = saveState.volumes.map((v) =>
             v.url && v.url.trim() ? v.url : null,
           );
-          const decoded = stripEmbeddedData(
-            decodeDocument(nvRef.current.serializeDocument()),
-            { volumeUrls },
-          );
-
           const format: NvdFormat = saveState.document.format;
-          const data =
-            format === "cbor"
-              ? uint8ArrayToBase64(encodeDocument(decoded))
-              : toJsonSafe(decoded);
+
+          let data: unknown;
+          if (format === "cbor") {
+            // CBOR cannot be retargeted without a decoder, so linked volumes
+            // keep the url they were loaded from. The save dialog offers CBOR
+            // in download mode only.
+            data = uint8ArrayToBase64(
+              nvRef.current.serializeDocument({ linkData: true }),
+            );
+          } else {
+            // Parse back to an object: the backend stores `data` as a dict and
+            // pretty-prints it, which keeps saved .nvd files diffable.
+            const text = new TextDecoder().decode(
+              nvRef.current.serializeDocument({
+                format: "json",
+                linkData: true,
+              }),
+            );
+            data = retargetVolumeUrls(
+              JSON.parse(text) as Record<string, unknown>,
+              volumeUrls,
+            );
+          }
 
           const response = await fetch("/data/nvd", {
             method: "POST",

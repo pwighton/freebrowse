@@ -100,12 +100,27 @@ export default function SaveDialog({
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <RadioGroupItem value="cbor" id="format-cbor" />
-                    <Label htmlFor="format-cbor" className="text-sm font-normal">
+                    <RadioGroupItem
+                      value="cbor"
+                      id="format-cbor"
+                      disabled={!saveState.isDownloadMode}
+                    />
+                    <Label
+                      htmlFor="format-cbor"
+                      className="text-sm font-normal data-[disabled]:text-muted-foreground"
+                      data-disabled={!saveState.isDownloadMode || undefined}
+                    >
                       CBOR
                     </Label>
                   </div>
                 </RadioGroup>
+                {!saveState.isDownloadMode && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    CBOR is download-only: saving to the server rewrites each
+                    volume&rsquo;s URL to its upload destination, which needs the
+                    text format.
+                  </p>
+                )}
               </div>
             </div>
           </div>

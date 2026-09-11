@@ -342,9 +342,28 @@ export class NiiVue extends EventTarget {
     void source;
     this.emit("documentLoaded");
   }
-  serializeDocument(): Uint8Array {
+  serializeDocument(options?: {
+    format?: "cbor" | "json";
+    linkData?: boolean;
+    settings?: unknown;
+  }): Uint8Array {
+    this.lastSerializeOptions = options;
+    if (options?.format === "json") {
+      // Minimal but real JSON document, so callers that decode/parse the
+      // result (the backend save path) exercise their actual code.
+      return new TextEncoder().encode(
+        JSON.stringify({ version: 9, volumes: [], meshes: [] }),
+      );
+    }
     return new Uint8Array();
   }
+
+  /** Last options passed to `serializeDocument`, for test assertions. */
+  lastSerializeOptions?: {
+    format?: "cbor" | "json";
+    linkData?: boolean;
+    settings?: unknown;
+  };
   addColormap(name: string, cmap: unknown): string {
     void cmap;
     this.emit("colormapAdded", { name });
