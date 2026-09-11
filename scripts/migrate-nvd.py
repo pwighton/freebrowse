@@ -302,6 +302,23 @@ def _has_mesh_payload(meshes_string) -> bool:
         return True
 
 
+def is_already_migrated(doc: dict) -> bool:
+    """True if this is already a niivue-mono document rather than a legacy one.
+
+    A niivue-mono document always carries a numeric `version` (NVDocument's
+    `deserialize` rejects anything else outright with "Invalid NVD file: missing
+    version"); old niivue's DocumentData / ExportDocumentData has no such field.
+    Verified against the corpus: 0 of 261 legacy documents carry a numeric
+    `version`.
+
+    Re-migrating one is silently destructive — there is no `imageOptionsArray` to
+    read, so it emits a structurally valid document with zero volumes and zero
+    meshes, discarding the scene.
+    """
+    v = doc.get("version")
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 def is_embedded_document(doc: dict) -> bool:
     """True if the doc carries embedded binary payloads (full-export shape).
 
@@ -420,10 +437,19 @@ def main(argv=None):
         return 1
 
     errors = 0
+    skipped = 0
     for in_path in files:
         try:
             with open(in_path) as f:
                 doc = json.load(f)
+            if isinstance(doc, dict) and is_already_migrated(doc):
+                # Not an error: a mixed directory legitimately contains both.
+                _warn(
+                    f"{in_path}: already niivue-mono format "
+                    f"(version {doc.get('version')}) — skipped"
+                )
+                skipped += 1
+                continue
             stem = os.path.splitext(os.path.basename(in_path))[0]
             doc_v8 = migrate_document(
                 doc, assets_dir=args.assets_dir, doc_stem=stem
@@ -444,6 +470,8 @@ def main(argv=None):
             _warn(f"{in_path}: {e}")
             errors += 1
 
+    if skipped:
+        _warn(f"{skipped} file(s) already migrated, skipped")
     if errors:
         _warn(f"{errors} file(s) failed")
     return 1 if errors else 0
