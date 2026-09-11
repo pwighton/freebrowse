@@ -1,13 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
 import type { DrawingOptions } from "@/store/types";
 import { useDrawing } from "./use-drawing";
 
 type DrawRef = Parameters<typeof useDrawing>[0];
-const refOf = (nv: NiiVueGPU) => ({ current: nv }) as unknown as DrawRef;
+const refOf = (nv: NiiVue) => ({ current: nv }) as unknown as DrawRef;
 
 const DEFAULT: DrawingOptions = {
   enabled: false,
@@ -23,7 +23,7 @@ const DEFAULT: DrawingOptions = {
   filename: "drawing.nii.gz",
 };
 
-function render(nv: NiiVueGPU, drawing: Partial<DrawingOptions> = {}) {
+function render(nv: NiiVue, drawing: Partial<DrawingOptions> = {}) {
   useFreeBrowseStore.setState({ drawingOptions: { ...DEFAULT, ...drawing } });
   return renderHook(() => useDrawing(refOf(nv), () => {}));
 }
@@ -37,7 +37,7 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("create layer: createEmptyDrawing + applies colormap/opacity, starts in none", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     const spy = vi.spyOn(nv, "createEmptyDrawing");
     const { result } = render(nv, { colormap: "_itksnap", opacity: 0.8 });
@@ -52,7 +52,7 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("no layer created without a background volume", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const spy = vi.spyOn(nv, "createEmptyDrawing");
     const { result } = render(nv);
     act(() => result.current.handleCreateDrawingLayer());
@@ -60,8 +60,12 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("pen mode enables drawing with pen value + fill", () => {
-    const nv = new NiiVueGPU();
-    const { result } = render(nv, { penValue: 3, penFill: true, penErases: false });
+    const nv = new NiiVue();
+    const { result } = render(nv, {
+      penValue: 3,
+      penFill: true,
+      penErases: false,
+    });
     act(() => result.current.handleDrawModeChange("pen"));
     expect(nv.drawPenValue).toBe(3);
     expect(nv.drawPenFilled).toBe(true);
@@ -71,14 +75,14 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("pen mode with erase paints value 0", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const { result } = render(nv, { penValue: 3, penErases: true });
     act(() => result.current.handleDrawModeChange("pen"));
     expect(nv.drawPenValue).toBe(0);
   });
 
   test("none mode disables drawing", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const { result } = render(nv, { mode: "pen" });
     act(() => result.current.handleDrawModeChange("none"));
     expect(nv.drawIsEnabled).toBe(false);
@@ -86,7 +90,7 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("penValue is store-owned and pushed to niivue in pen mode", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const { result } = render(nv, { mode: "pen", penErases: false });
     act(() => result.current.handlePenValueChange(7));
     expect(useFreeBrowseStore.getState().drawingOptions.penValue).toBe(7);
@@ -94,8 +98,12 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("toggling erase sets drawPenValue 0 without losing the stored penValue", () => {
-    const nv = new NiiVueGPU();
-    const { result } = render(nv, { mode: "pen", penValue: 4, penErases: false });
+    const nv = new NiiVue();
+    const { result } = render(nv, {
+      mode: "pen",
+      penValue: 4,
+      penErases: false,
+    });
     act(() => result.current.handlePenErasesChange(true));
     expect(nv.drawPenValue).toBe(0);
     expect(useFreeBrowseStore.getState().drawingOptions.penValue).toBe(4); // retained
@@ -104,7 +112,7 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("fill / opacity / colormap dispatch to niivue", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const { result } = render(nv);
     act(() => result.current.handlePenFillChange(false));
     expect(nv.drawPenFilled).toBe(false);
@@ -112,12 +120,14 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     expect(useFreeBrowseStore.getState().drawingOptions.penFill).toBe(false);
     act(() => result.current.handleDrawingOpacityChange(0.4));
     expect(nv.drawOpacity).toBe(0.4);
-    act(() => result.current.handleDrawingColormapChange(colormapEvent("_slicer3d")));
+    act(() =>
+      result.current.handleDrawingColormapChange(colormapEvent("_slicer3d")),
+    );
     expect(nv.drawColormap).toBe("_slicer3d");
   });
 
   test("undo calls nv.drawUndo", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     const spy = vi.spyOn(nv, "drawUndo");
     const { result } = render(nv);
     act(() => result.current.handleDrawUndo());
@@ -125,7 +135,7 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
   });
 
   test("save drawing: export -> close -> re-add as roi_i256 label volume", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     nv.drawingVolume = { id: "drawing" };
     const saveSpy = vi.spyOn(nv, "saveVolume");
@@ -146,14 +156,16 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     // Raw bytes -> File named .nii (the .gz is stripped so the loader won't gunzip).
     expect(addSpy.mock.calls[0][0].name).toBe("seg.nii");
     // Saved as a roi_i256 label volume (dropdown colormap + label colormap).
-    expect(volSpy).toHaveBeenCalledWith(expect.any(Number), { colormap: "roi_i256" });
+    expect(volSpy).toHaveBeenCalledWith(expect.any(Number), {
+      colormap: "roi_i256",
+    });
     expect(labelSpy).toHaveBeenCalledWith(expect.any(Number), "roi_i256");
     expect(useFreeBrowseStore.getState().drawingOptions.mode).toBe("none");
     expect(useFreeBrowseStore.getState().activeTab).toBe("sceneDetails");
   });
 
   test("save drawing is a no-op with no open drawing", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     const saveSpy = vi.spyOn(nv, "saveVolume");
     const { result } = render(nv);

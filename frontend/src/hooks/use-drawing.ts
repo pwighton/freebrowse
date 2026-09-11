@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
-import { type NiiVueGPU as Niivue } from "@niivue/niivue";
+import NiiVue from "@niivue/niivue";
 
 /**
  * Core pen-drawing handlers (Phase 4a). Hybrid store/command model:
@@ -15,7 +15,7 @@ import { type NiiVueGPU as Niivue } from "@niivue/niivue";
  *    erase). Magic-wand params stay store-owned for 4c.
  */
 export function useDrawing(
-  nvRef: React.RefObject<Niivue | null>,
+  nvRef: React.RefObject<NiiVue | null>,
   debouncedGLUpdate: () => void,
 ) {
   void debouncedGLUpdate; // nv draw setters refresh the GPU; kept for call-site stability
@@ -49,7 +49,9 @@ export function useDrawing(
       const nv = nvRef.current;
       if (!nv) return;
       if (mode === "pen") {
-        nv.drawPenValue = drawingOptions.penErases ? 0 : drawingOptions.penValue;
+        nv.drawPenValue = drawingOptions.penErases
+          ? 0
+          : drawingOptions.penValue;
         nv.drawPenFilled = drawingOptions.penFill; // flood-fill the enclosed shape
         nv.drawIsFillOverwriting = drawingOptions.penFill; // fill overwrites existing labels
         nv.drawIsEnabled = true;

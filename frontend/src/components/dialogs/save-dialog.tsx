@@ -13,10 +13,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import type { NvdFormat } from "@/store/types";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue } from "@niivue/niivue";
 
 interface SaveDialogProps {
-  nvRef: React.RefObject<Niivue | null>;
+  nvRef: React.RefObject<NiiVue | null>;
   onConfirm: () => void;
   onCancel: () => void;
   onVolumeUrlChange: (index: number, url: string) => void;
@@ -68,8 +68,8 @@ export default function SaveDialog({
                 className="text-sm font-medium"
               >
                 {saveState.isDownloadMode
-                  ? "Niivue Document Name"
-                  : "Niivue Document Save Location"}
+                  ? "NiiVue Document Name"
+                  : "NiiVue Document Save Location"}
               </Label>
               <Input
                 id="save-location"

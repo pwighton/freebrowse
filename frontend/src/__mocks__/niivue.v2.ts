@@ -1,10 +1,10 @@
 /**
  * niivue-mono (`@niivue/niivue` 1.0.0-rc.*) test double — v2, side-by-side.
  *
- * Models the new `NiiVueGPU` controller: an `EventTarget` whose flat setters and
+ * Models the new `NiiVue` controller: an `EventTarget` whose flat setters and
  * mutating methods dispatch the same `CustomEvent`s the real controller emits
  * (`change`, `volumeUpdated`, `meshUpdated`, `volumeRemoved`, `drawingChanged`,
- * ...). This is what makes `registerNiivueEvents` testable without a GPU.
+ * ...). This is what makes `registerNiiVueEvents` testable without a GPU.
  *
  * NOT yet wired into `vi.mock("@niivue/niivue")` — the app still uses the legacy
  * `./niivue.ts` mock until Phase 2. `niivue-sync` tests import this directly.
@@ -61,7 +61,7 @@ const CHANGE_PROPS = [
   "drawIsFillOverwriting",
 ] as const;
 
-export class NiiVueGPU extends EventTarget {
+export class NiiVue extends EventTarget {
   volumes: MockVolume[] = [];
   meshes: MockMesh[] = [];
   drawingVolume: unknown = null;
@@ -401,7 +401,7 @@ export class MockExtensionContext {
     voxelSizeMM: [1, 1, 1] as [number, number, number],
   };
 
-  constructor(private nv: NiiVueGPU) {}
+  constructor(private nv: NiiVue) {}
 
   get drawing() {
     return this.nv.drawingVolume ? this._drawing : null;
@@ -428,7 +428,7 @@ export class MockExtensionContext {
   }
 }
 
-export default NiiVueGPU;
+export default NiiVue;
 
 // Minimal placeholder types the app imports as values in the new API.
 export class NVImage {}

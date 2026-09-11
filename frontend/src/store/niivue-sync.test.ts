@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
-import {
-  registerNiivueEvents,
-  type NiivueSyncTarget,
-} from "./niivue-sync";
+import { NiiVue } from "@/__mocks__/niivue.v2";
+import { registerNiiVueEvents, type NiiVueSyncTarget } from "./niivue-sync";
 
 function makeTarget() {
   return {
@@ -17,18 +14,18 @@ function makeTarget() {
     onLocationChange: vi.fn(),
     onDocumentLoaded: vi.fn(),
     onColormapAdded: vi.fn(),
-  } satisfies NiivueSyncTarget;
+  } satisfies NiiVueSyncTarget;
 }
 
-describe("registerNiivueEvents", () => {
-  let nv: NiiVueGPU;
+describe("registerNiiVueEvents", () => {
+  let nv: NiiVue;
   let target: ReturnType<typeof makeTarget>;
   let teardown: () => void;
 
   beforeEach(() => {
-    nv = new NiiVueGPU();
+    nv = new NiiVue();
     target = makeTarget();
-    teardown = registerNiivueEvents(nv, target);
+    teardown = registerNiiVueEvents(nv, target);
   });
 
   it("routes non-drawing scalar `change` to onViewerOptionChange", async () => {
@@ -43,7 +40,10 @@ describe("registerNiivueEvents", () => {
   it("routes drawing scalars to onDrawingOptionChange", () => {
     nv.drawOpacity = 0.5;
     nv.drawColormap = "red";
-    expect(target.onDrawingOptionChange).toHaveBeenCalledWith("drawOpacity", 0.5);
+    expect(target.onDrawingOptionChange).toHaveBeenCalledWith(
+      "drawOpacity",
+      0.5,
+    );
     expect(target.onDrawingOptionChange).toHaveBeenCalledWith(
       "drawColormap",
       "red",
@@ -58,7 +58,10 @@ describe("registerNiivueEvents", () => {
     expect(target.onViewerOptionChange).toHaveBeenCalledTimes(1);
     expect(target.onViewerOptionChange).toHaveBeenCalledWith("sliceType", 2);
     expect(target.onDrawingOptionChange).toHaveBeenCalledTimes(1);
-    expect(target.onDrawingOptionChange).toHaveBeenCalledWith("drawPenValue", 3);
+    expect(target.onDrawingOptionChange).toHaveBeenCalledWith(
+      "drawPenValue",
+      3,
+    );
   });
 
   it("re-reads the volume list on load / remove / reorder", async () => {

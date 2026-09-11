@@ -10,7 +10,7 @@ import {
 } from "@/lib/nvd-json";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
 import type { NvdFormat } from "@/store/types";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue } from "@niivue/niivue";
 
 /** Append the given extension if the filename lacks it. */
 function ensureExt(name: string, ext: string): string {
@@ -30,7 +30,7 @@ function downloadBytes(bytes: Uint8Array | string, filename: string, type: strin
   URL.revokeObjectURL(url);
 }
 
-export function useSave(nvRef: React.RefObject<Niivue | null>) {
+export function useSave(nvRef: React.RefObject<NiiVue | null>) {
   const saveDialogOpen = useFreeBrowseStore((s) => s.saveDialogOpen);
   const setSaveDialogOpen = useFreeBrowseStore((s) => s.setSaveDialogOpen);
   const saveState = useFreeBrowseStore((s) => s.saveState);

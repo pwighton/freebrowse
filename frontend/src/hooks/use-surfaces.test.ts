@@ -1,12 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
 import { useSurfaces } from "./use-surfaces";
 
 type SurfRef = Parameters<typeof useSurfaces>[0];
-const refOf = (nv: NiiVueGPU) => ({ current: nv }) as unknown as SurfRef;
+const refOf = (nv: NiiVue) => ({ current: nv }) as unknown as SurfRef;
 const noop = () => {};
 
 // Command-only: handlers must issue the right nv.* command (by index — meshes
@@ -17,7 +17,7 @@ describe("useSurfaces — command dispatch", () => {
   });
 
   test("toggleSurfaceVisibility hides a visible mesh via opacity 0", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.meshes.push({ opacity: 1, layers: [] });
     const spy = vi.spyOn(nv, "setMesh");
     const { result } = renderHook(() => useSurfaces(refOf(nv), noop));
@@ -26,7 +26,7 @@ describe("useSurfaces — command dispatch", () => {
   });
 
   test("toggleSurfaceVisibility shows a hidden mesh via opacity 1", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.meshes.push({ opacity: 0, layers: [] });
     const spy = vi.spyOn(nv, "setMesh");
     const { result } = renderHook(() => useSurfaces(refOf(nv), noop));
@@ -35,7 +35,7 @@ describe("useSurfaces — command dispatch", () => {
   });
 
   test("removeSurface calls nv.removeMesh by index", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.meshes.push({ opacity: 1, layers: [] });
     const spy = vi.spyOn(nv, "removeMesh");
     const { result } = renderHook(() => useSurfaces(refOf(nv), noop));
@@ -44,7 +44,7 @@ describe("useSurfaces — command dispatch", () => {
   });
 
   test("handleSurfaceOpacityChange applies to the selected surface", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.meshes.push({ opacity: 1, layers: [] });
     useFreeBrowseStore.setState({ currentSurfaceIndex: 0 });
     const spy = vi.spyOn(nv, "setMesh");
@@ -54,7 +54,7 @@ describe("useSurfaces — command dispatch", () => {
   });
 
   test("handleMeshShaderChange sets shaderType by name", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.meshes.push({ opacity: 1, layers: [] });
     useFreeBrowseStore.setState({ currentSurfaceIndex: 0 });
     const spy = vi.spyOn(nv, "setMesh");
@@ -66,7 +66,7 @@ describe("useSurfaces — command dispatch", () => {
   test("handleSurfaceColorChange sets rgba255 (debounced)", () => {
     vi.useFakeTimers();
     try {
-      const nv = new NiiVueGPU();
+      const nv = new NiiVue();
       nv.meshes.push({ opacity: 1, layers: [] });
       useFreeBrowseStore.setState({ currentSurfaceIndex: 0 });
       const spy = vi.spyOn(nv, "setMesh");
@@ -81,7 +81,7 @@ describe("useSurfaces — command dispatch", () => {
   });
 
   test("no command when no surface is selected / mesh missing", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     useFreeBrowseStore.setState({ currentSurfaceIndex: null });
     const spy = vi.spyOn(nv, "setMesh");
     const { result } = renderHook(() => useSurfaces(refOf(nv), noop));
