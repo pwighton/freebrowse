@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
-"""Migrate legacy FreeBrowse .nvd documents to niivue-mono's NVDocumentData v8.
+"""Migrate legacy FreeBrowse .nvd documents to niivue-mono's NVDocumentData v9.
 
 Migrate niivue documents from the old convention (up to @niivue/niivue-v0.69.0)
 to the new convention (aka niivue-mono since niivue@1.0.0-rc.2)
+
+The input is old niivue's OWN document format -- `DocumentData` /
+`ExportDocumentData` in niivue/packages/niivue/src/nvdocument.ts (`title`,
+`imageOptionsArray`, `opts`, `encodedImageBlobs`, `encodedDrawingBlob`,
+`meshesString`, `sceneData`, ...) -- plus ONE FreeBrowse-specific extension: a
+top-level `meshes` array carrying surfaces and their scalar-overlay layers.
+Classic niivue has `meshOptionsArray` and serializes meshes into `meshesString`;
+it never reads a top-level `meshes`. That extension is why niivue-mono's own
+converter (packages/niivue/src/documentLegacy.ts, which reads meshes only from
+`meshesString`) cannot replace this script -- it would silently drop every
+surface.
 
 Usage:
     migrate-nvd.py INPUT [INPUT ...] [-o OUTDIR] [--cbor] [--assets-dir DIR] [-v]
@@ -21,7 +32,12 @@ import os
 import sys
 from datetime import datetime, timezone
 
-DOCUMENT_VERSION = 8
+# niivue-mono's current schema (NVConstants.NVD_DOCUMENT_VERSION). v8 -> v9 was
+# the sparse-settings change (niivue/mono 29f943e), not a field change, and
+# `deserialize` carries no v8 -> v9 migration -- it rejects only versions NEWER
+# than its own and migrates only `version <= 5`. So emitting 9 is accuracy, not
+# a compatibility requirement.
+DOCUMENT_VERSION = 9
 
 # --- mesh shader index (old niivue) -> shaderType name (niivue-mono) ----------
 # Old order: createDefaultMeshShaders() in niivue/.../ShaderManager.ts.
@@ -63,25 +79,32 @@ def shader_name(index) -> str:
 
 
 def _num(value):
-    """Coerce a legacy numeric field to a float.
+    """Coerce a legacy numeric field to a float, DROPPING non-finite values.
 
     Old niivue serialized non-finite numbers as the strings 'NaN' / 'infinity' /
-    '-infinity' (see encodeNumberForJSON). Normalize those to Python floats so
-    the tag walk can re-tag them. Leaves genuine numbers untouched; returns other
-    values unchanged.
+    '-infinity' (see encodeNumberForJSON); Python's json also parses bare `NaN` /
+    `Infinity` literals into real floats. Either way niivue-mono's JSON codec has
+    no representation for them (encodeDocumentJSON tags typed arrays only), so
+    returning None here drops the field -- to_json_safe omits None keys, and
+    `applyDocumentToModel` guards every field with `!== undefined`, leaving the
+    model's own default. For calMinNeg/calMaxNeg that default IS NaN
+    (NVModel.ts:1411), so omitting reproduces the legacy value exactly.
+
+    This also keeps `json.dump(allow_nan=False)` in write_json meaningful as the
+    assertion that nothing non-finite escaped the walk.
+
+    Leaves genuine finite numbers untouched; returns other values unchanged.
     """
     if isinstance(value, str):
         s = value.strip().lower()
-        if s == "nan":
-            return float("nan")
-        if s in ("infinity", "inf", "+infinity", "+inf"):
-            return float("inf")
-        if s in ("-infinity", "-inf"):
-            return float("-inf")
+        if s in ("nan", "infinity", "inf", "+infinity", "+inf", "-infinity", "-inf"):
+            return None
         try:
-            return float(value)
+            value = float(value)
         except ValueError:
             return value
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     return value
 
 
@@ -103,23 +126,20 @@ def _canonical_colormap(name):
     return name[0].upper() + name[1:]
 
 
-# --- JSON tag walk (mirror of toJsonSafe in nvd-json.ts) ----------------------
+# --- JSON tag walk (mirror of encodeDocumentJSON in niivue-mono) --------------
+# Tag convention: niivue-mono/packages/niivue/src/documentJson.ts
+#   bytes -> {"$ta": "Uint8Array", "b64": "..."}
+# That is the ONLY tag it defines. Non-finite numbers have no encoding (they
+# would become bare `null`), so `_num` drops those fields upstream of this
+# walk rather than inventing a tag niivue could not read. See niivue/mono
+# issue 8a in 20260911-niivue-mono-migration-plan.md.
 def to_json_safe(value):
-    """Return a JSON-safe copy: bytes and non-finite floats become tagged dicts."""
+    """Return a JSON-safe copy: bytes become $ta-tagged dicts."""
     if isinstance(value, (bytes, bytearray, memoryview)):
         return {
-            "$nvd": "ta",
-            "type": "Uint8Array",
+            "$ta": "Uint8Array",
             "b64": base64.b64encode(bytes(value)).decode("ascii"),
         }
-    if isinstance(value, float) and not math.isfinite(value):
-        if math.isnan(value):
-            v = "NaN"
-        elif value > 0:
-            v = "Infinity"
-        else:
-            v = "-Infinity"
-        return {"$nvd": "num", "v": v}
     if isinstance(value, dict):
         out = {}
         for k, v in value.items():
@@ -154,11 +174,11 @@ def _scene_defaults():
 
 
 def new_document_skeleton(created: str | None = None):
-    """A minimal, valid, empty NVDocumentData v8 (no volumes/meshes yet).
+    """A minimal, valid, empty NVDocumentData v9 (no volumes/meshes yet).
 
     Only the fields niivue-mono's `deserialize` / `applyDocumentToModel` actually
     require are emitted, keeping migrated docs close to the terse originals:
-      * `version`     — validated (must be a number <= 8).
+      * `version`     — validated (must be a number <= 9).
       * `scene`       — required, and every field is read individually (the color
                         arrays are spread), so it must be COMPLETE.
       * `layout`      — required only to be present/truthy; applied via
@@ -252,11 +272,50 @@ def transform_mesh(old: dict) -> dict:
     return mesh
 
 
+def _contains_object(node) -> bool:
+    """True if a parsed JSON tree contains a dict anywhere."""
+    if isinstance(node, dict):
+        return True
+    if isinstance(node, list):
+        return any(_contains_object(x) for x in node)
+    return False
+
+
+def _has_mesh_payload(meshes_string) -> bool:
+    """True if `meshesString` carries real serialized mesh geometry.
+
+    Old niivue's ExportDocumentData declares `meshesString` as REQUIRED, so its
+    serializer emits the key even with no meshes — presence proves nothing. The
+    corpus's only example is `'[[1,[]]]'`, a degenerate empty list that must not
+    be treated as payload.
+
+    A real entry is an OBJECT (both this script's transform_mesh and niivue-mono's
+    own documentLegacy.ts read `m.url` / `m.name` off dicts), so "contains a dict"
+    is the test. An unparseable string is treated as payload — better to route it
+    to the 5d path for attention than to silently drop meshes.
+    """
+    if not isinstance(meshes_string, str) or len(meshes_string.strip()) <= 2:
+        return False
+    try:
+        return _contains_object(json.loads(meshes_string))
+    except ValueError:
+        return True
+
+
 def is_embedded_document(doc: dict) -> bool:
-    """True if the doc carries embedded binary payloads (full-export shape)."""
-    return any(
-        k in doc for k in ("encodedImageBlobs", "meshesString", "encodedDrawingBlob")
-    )
+    """True if the doc carries embedded binary payloads (full-export shape).
+
+    Tests VALUES, not key presence: a document saved by old niivue's full export
+    always carries `encodedImageBlobs` / `meshesString` / `previewImageDataURL`,
+    empty or not, because the type declares them required. Keying off presence
+    misclassified every such document as embedded — including URL-only documents
+    that convert perfectly well.
+    """
+    if any(bool(b) for b in doc.get("encodedImageBlobs") or []):
+        return True
+    if doc.get("encodedDrawingBlob"):
+        return True
+    return _has_mesh_payload(doc.get("meshesString"))
 
 
 def migrate_url_document(doc: dict, *, created: str | None = None) -> dict:
