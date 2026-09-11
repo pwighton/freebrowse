@@ -1,26 +1,32 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 
 export function useFileLoading(
-  nvRef: React.RefObject<Niivue | null>,
+  nvRef: React.RefObject<NiiVue | null>,
   applyViewerOptions: () => void,
-  syncViewerOptionsFromNiivue: () => void,
+  syncViewerOptionsFromNiiVue: () => void,
   updateSurfaceDetails: () => void,
   handleLocationChange: (locationObject: any) => void,
 ) {
   const showUploader = useFreeBrowseStore((s) => s.showUploader);
   const setShowUploader = useFreeBrowseStore((s) => s.setShowUploader);
   const currentImageIndex = useFreeBrowseStore((s) => s.currentImageIndex);
-  const setCurrentImageIndex = useFreeBrowseStore((s) => s.setCurrentImageIndex);
+  const setCurrentImageIndex = useFreeBrowseStore(
+    (s) => s.setCurrentImageIndex,
+  );
   const volumeVersion = useFreeBrowseStore((s) => s.volumeVersion);
-  const incrementVolumeVersion = useFreeBrowseStore((s) => s.incrementVolumeVersion);
+  const incrementVolumeVersion = useFreeBrowseStore(
+    (s) => s.incrementVolumeVersion,
+  );
   const currentSurfaceIndex = useFreeBrowseStore((s) => s.currentSurfaceIndex);
-  const setCurrentSurfaceIndex = useFreeBrowseStore((s) => s.setCurrentSurfaceIndex);
+  const setCurrentSurfaceIndex = useFreeBrowseStore(
+    (s) => s.setCurrentSurfaceIndex,
+  );
   const setActiveTab = useFreeBrowseStore((s) => s.setActiveTab);
 
-  const serverlessMode = import.meta.env.VITE_SERVERLESS === 'true';
+  const serverlessMode = import.meta.env.VITE_SERVERLESS === "true";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const surfaceFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,14 +38,16 @@ export function useFileLoading(
       // The old-schema path (NVDocument.loadFromJSON, encodedImageBlobs,
       // meshesString, layer-name backfill) is retired. Disabled until then.
       void jsonData;
-      void syncViewerOptionsFromNiivue;
+      void syncViewerOptionsFromNiiVue;
       void updateSurfaceDetails;
-      console.warn("loadNvdData: document loading disabled during niivue-mono migration (P5)");
+      console.warn(
+        "loadNvdData: document loading disabled during niivue-mono migration (P5)",
+      );
     },
-    [syncViewerOptionsFromNiivue, updateSurfaceDetails],
+    [syncViewerOptionsFromNiiVue, updateSurfaceDetails],
   );
 
-  // Add uploaded files to Niivue
+  // Add uploaded files to NiiVue
   const handleFileUpload = useCallback(
     async (files: File[]) => {
       if (!nvRef.current) return;
@@ -95,7 +103,16 @@ export function useFileLoading(
         }
       }
     },
-    [nvRef, showUploader, currentImageIndex, loadNvdData, applyViewerOptions, incrementVolumeVersion, setShowUploader, setCurrentImageIndex],
+    [
+      nvRef,
+      showUploader,
+      currentImageIndex,
+      loadNvdData,
+      applyViewerOptions,
+      incrementVolumeVersion,
+      setShowUploader,
+      setCurrentImageIndex,
+    ],
   );
 
   const handleImagingFileSelect = useCallback(
@@ -142,7 +159,14 @@ export function useFileLoading(
         console.error("Error loading imaging file:", error);
       }
     },
-    [nvRef, showUploader, applyViewerOptions, incrementVolumeVersion, setShowUploader, setCurrentImageIndex],
+    [
+      nvRef,
+      showUploader,
+      applyViewerOptions,
+      incrementVolumeVersion,
+      setShowUploader,
+      setCurrentImageIndex,
+    ],
   );
 
   const handleNvdFileSelect = useCallback(
@@ -163,7 +187,9 @@ export function useFileLoading(
 
         let retries = 0;
         while (!nv.canvas && retries < 20) {
-          console.log(`Waiting for canvas to be ready... attempt ${retries + 1}`);
+          console.log(
+            `Waiting for canvas to be ready... attempt ${retries + 1}`,
+          );
           await new Promise((resolve) => setTimeout(resolve, 100));
           retries++;
         }
@@ -243,10 +269,17 @@ export function useFileLoading(
       }
       e.target.value = "";
     },
-    [nvRef, showUploader, currentSurfaceIndex, updateSurfaceDetails, setShowUploader, setCurrentSurfaceIndex],
+    [
+      nvRef,
+      showUploader,
+      currentSurfaceIndex,
+      updateSurfaceDetails,
+      setShowUploader,
+      setCurrentSurfaceIndex,
+    ],
   );
 
-  // Set up Niivue event listeners (niivue-mono uses the EventTarget API rather
+  // Set up NiiVue event listeners (niivue-mono uses the EventTarget API rather
   // than assignable onXxx callback props).
   useEffect(() => {
     const nv = nvRef.current;
@@ -319,12 +352,12 @@ export function useFileLoading(
       if ((window as any).__EMBEDDED_NVD_LOADED__) return;
       (window as any).__EMBEDDED_NVD_LOADED__ = true;
 
-      console.log('Loading embedded NVD data');
+      console.log("Loading embedded NVD data");
       setShowUploader(false);
 
       let retries = 0;
       while (!nvRef.current.canvas && retries < 20) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         retries++;
       }
 
@@ -333,15 +366,27 @@ export function useFileLoading(
       }
     };
 
-    window.addEventListener('loadEmbeddedNvd', handleEmbeddedNvd as unknown as EventListener);
+    window.addEventListener(
+      "loadEmbeddedNvd",
+      handleEmbeddedNvd as unknown as EventListener,
+    );
 
-    if ((window as any).__EMBEDDED_NVD_DATA__ && !(window as any).__EMBEDDED_NVD_LOADED__) {
-      window.dispatchEvent(new CustomEvent('loadEmbeddedNvd', {
-        detail: (window as any).__EMBEDDED_NVD_DATA__
-      }));
+    if (
+      (window as any).__EMBEDDED_NVD_DATA__ &&
+      !(window as any).__EMBEDDED_NVD_LOADED__
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("loadEmbeddedNvd", {
+          detail: (window as any).__EMBEDDED_NVD_DATA__,
+        }),
+      );
     }
 
-    return () => window.removeEventListener('loadEmbeddedNvd', handleEmbeddedNvd as unknown as EventListener);
+    return () =>
+      window.removeEventListener(
+        "loadEmbeddedNvd",
+        handleEmbeddedNvd as unknown as EventListener,
+      );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {

@@ -1,6 +1,6 @@
 /**
- * registerNiivueEvents — the single event-driven sync bridge between a
- * niivue-mono `NiiVueGPU` instance and FreeBrowse's UI state.
+ * registerNiiVueEvents — the single event-driven sync bridge between a
+ * niivue-mono `NiiVue` instance and FreeBrowse's UI state.
  *
  * niivue-mono's controller extends `EventTarget` and emits a `CustomEvent` for
  * every state mutation that goes through its API (setters + methods). By making
@@ -16,14 +16,14 @@
  * handled exactly once. Specific events are used ONLY where `change` carries no
  * equivalent: structural volume/mesh changes, drawing actions, location, etc.
  *
- * Phase 0: this is the dispatcher skeleton + its {@link NiivueSyncTarget}
+ * Phase 0: this is the dispatcher skeleton + its {@link NiiVueSyncTarget}
  * contract, verified against the event-emitting mock. The concrete adapter that
  * maps these intent callbacks onto the Zustand store (with niivue->store name
  * and value translation) is added as hooks convert in Phase 2+.
  */
 
 /** Minimal shape of a niivue instance this bridge needs. */
-export interface NiivueEventSource extends EventTarget {
+export interface NiiVueEventSource extends EventTarget {
   volumes: unknown[];
   meshes: unknown[];
 }
@@ -32,7 +32,7 @@ export interface NiivueEventSource extends EventTarget {
  * Intent-level sink for niivue state changes. Phase 2+ provides a concrete
  * implementation backed by the Zustand store; tests provide spies.
  */
-export interface NiivueSyncTarget {
+export interface NiiVueSyncTarget {
   /** A flat viewer/scene scalar changed (niivue property name + new value). */
   onViewerOptionChange(property: string, value: unknown): void;
   /** A drawing-related scalar changed (pen value, opacity, colormap, ...). */
@@ -83,9 +83,9 @@ function detailOf<T>(event: Event): T {
  * Subscribe `target` to all relevant events on `nv`. Returns a teardown that
  * removes every listener (call it on unmount / instance replacement).
  */
-export function registerNiivueEvents(
-  nv: NiivueEventSource,
-  target: NiivueSyncTarget,
+export function registerNiiVueEvents(
+  nv: NiiVueEventSource,
+  target: NiiVueSyncTarget,
 ): () => void {
   const listeners: [string, EventListener][] = [];
   const on = (type: string, handler: EventListener): void => {

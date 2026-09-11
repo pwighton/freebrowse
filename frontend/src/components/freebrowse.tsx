@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { registerNiivueEvents } from "@/store/niivue-sync";
+import { registerNiiVueEvents } from "@/store/niivue-sync";
 import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useLocation } from "@/hooks/use-location";
@@ -16,7 +16,7 @@ import {
   resolveImagingUploadConfirmation,
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
-import { NiiVueGPU as Niivue } from "@niivue/niivue";
+import { NiiVue as NiiVue } from "@niivue/niivue";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
 import Sidebar from "./sidebar";
@@ -26,7 +26,7 @@ import SettingsDialog from "./dialogs/settings-dialog";
 import ImagingUploadConfirmationDialog from "./dialogs/imaging-upload-confirmation-dialog";
 import SessionDeleteConfirmationDialog from "./dialogs/session-delete-confirmation-dialog";
 
-const nv = new Niivue({
+const nv = new NiiVue({
   // MIGRATION-TODO(P2): tune fontScale (was textHeight=0.02, different units).
   backend: "webgl2", // pin during migration; auto-select in P6
   placeholderText: "Drag-drop images",
@@ -36,15 +36,15 @@ const nv = new Niivue({
 });
 
 export default function FreeBrowse() {
-  const nvRef = useRef<Niivue | null>(nv);
+  const nvRef = useRef<NiiVue | null>(nv);
 
   // Event-driven sync: the Zustand store is a derived view of niivue state.
-  // registerNiivueEvents subscribes the store adapter to niivue's events, so
+  // registerNiiVueEvents subscribes the store adapter to niivue's events, so
   // both FreeBrowse's own command wrappers and external callers driving the
   // instance (window.freebrowse.nv) update the UI through the same path.
   useEffect(() => {
-    const teardown = registerNiivueEvents(nv, createStoreSyncTarget(nv));
-    (window as unknown as { freebrowse?: { nv: Niivue } }).freebrowse = { nv };
+    const teardown = registerNiiVueEvents(nv, createStoreSyncTarget(nv));
+    (window as unknown as { freebrowse?: { nv: NiiVue } }).freebrowse = { nv };
     return teardown;
   }, []);
 
@@ -52,7 +52,7 @@ export default function FreeBrowse() {
   const {
     viewerOptions,
     applyViewerOptions,
-    syncViewerOptionsFromNiivue,
+    syncViewerOptionsFromNiiVue,
     debouncedGLUpdate,
   } = useViewerOptions(nvRef, true);
   const { handleLocationChange } = useLocation(nvRef);
@@ -133,7 +133,7 @@ export default function FreeBrowse() {
   } = useFileLoading(
     nvRef,
     applyViewerOptions,
-    syncViewerOptionsFromNiivue,
+    syncViewerOptionsFromNiiVue,
     updateSurfaceDetails,
     handleLocationChange,
   );

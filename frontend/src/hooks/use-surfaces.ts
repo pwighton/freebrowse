@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 
 /**
  * Surface (mesh) handlers. Command-only: handlers issue nv.* commands and the
@@ -9,15 +9,19 @@ import type { NiiVueGPU as Niivue } from "@niivue/niivue";
  * surfaces slice directly.
  */
 export function useSurfaces(
-  nvRef: React.RefObject<Niivue | null>,
+  nvRef: React.RefObject<NiiVue | null>,
   debouncedGLUpdate: () => void,
 ) {
   void debouncedGLUpdate; // setMesh refreshes the GPU itself; kept for call-site stability
   const currentSurfaceIndex = useFreeBrowseStore((s) => s.currentSurfaceIndex);
-  const setCurrentSurfaceIndex = useFreeBrowseStore((s) => s.setCurrentSurfaceIndex);
+  const setCurrentSurfaceIndex = useFreeBrowseStore(
+    (s) => s.setCurrentSurfaceIndex,
+  );
   const surfaceToRemove = useFreeBrowseStore((s) => s.surfaceToRemove);
   const setSurfaceToRemove = useFreeBrowseStore((s) => s.setSurfaceToRemove);
-  const skipRemoveConfirmation = useFreeBrowseStore((s) => s.skipRemoveConfirmation);
+  const skipRemoveConfirmation = useFreeBrowseStore(
+    (s) => s.skipRemoveConfirmation,
+  );
   const setRemoveDialogOpen = useFreeBrowseStore((s) => s.setRemoveDialogOpen);
   void surfaceToRemove;
 
@@ -77,13 +81,22 @@ export function useSurfaces(
         setRemoveDialogOpen(true);
       }
     },
-    [skipRemoveConfirmation, removeSurface, setSurfaceToRemove, setRemoveDialogOpen],
+    [
+      skipRemoveConfirmation,
+      removeSurface,
+      setSurfaceToRemove,
+      setRemoveDialogOpen,
+    ],
   );
 
   const handleSurfaceOpacityChange = useCallback(
     (newOpacity: number) => {
       const nv = nvRef.current;
-      if (currentSurfaceIndex === null || !nv || !nv.meshes[currentSurfaceIndex])
+      if (
+        currentSurfaceIndex === null ||
+        !nv ||
+        !nv.meshes[currentSurfaceIndex]
+      )
         return;
       void nv.setMesh(currentSurfaceIndex, { opacity: newOpacity });
     },
@@ -93,7 +106,11 @@ export function useSurfaces(
   const handleSurfaceColorChange = useCallback(
     (hexColor: string) => {
       const nv = nvRef.current;
-      if (currentSurfaceIndex === null || !nv || !nv.meshes[currentSurfaceIndex])
+      if (
+        currentSurfaceIndex === null ||
+        !nv ||
+        !nv.meshes[currentSurfaceIndex]
+      )
         return;
       const r = parseInt(hexColor.slice(1, 3), 16);
       const g = parseInt(hexColor.slice(3, 5), 16);
@@ -113,7 +130,11 @@ export function useSurfaces(
   const handleMeshShaderChange = useCallback(
     (shaderName: string) => {
       const nv = nvRef.current;
-      if (currentSurfaceIndex === null || !nv || !nv.meshes[currentSurfaceIndex])
+      if (
+        currentSurfaceIndex === null ||
+        !nv ||
+        !nv.meshes[currentSurfaceIndex]
+      )
         return;
       void nv.setMesh(currentSurfaceIndex, { shaderType: shaderName });
     },

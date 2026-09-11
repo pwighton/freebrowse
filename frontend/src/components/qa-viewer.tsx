@@ -1,18 +1,18 @@
 import { useEffect, useRef } from "react";
-import { registerNiivueEvents } from "@/store/niivue-sync";
+import { registerNiiVueEvents } from "@/store/niivue-sync";
 import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useLocation } from "@/hooks/use-location";
 import { useVolumes } from "@/hooks/use-volumes";
 import { useFileLoading } from "@/hooks/use-file-loading";
-import { NiiVueGPU as Niivue } from "@niivue/niivue";
+import { NiiVue as NiiVue } from "@niivue/niivue";
 import { PanelRight } from "lucide-react";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
 import QaSidebar from "./qa-sidebar";
 import SettingsDialog from "./dialogs/settings-dialog";
 
-const nv = new Niivue({
+const nv = new NiiVue({
   // MIGRATION-TODO(P2): tune fontScale (was textHeight=0.02, different units).
   backend: "webgl2", // pin during migration; auto-select in P6
   placeholderText: "",
@@ -26,33 +26,25 @@ const nv = new Niivue({
 const noopSurface = () => {};
 
 export default function QaViewer() {
-  const nvRef = useRef<Niivue | null>(nv);
+  const nvRef = useRef<NiiVue | null>(nv);
 
   // Event-driven store sync for this viewer's instance (see FreeBrowse).
   useEffect(() => {
-    return registerNiivueEvents(nv, createStoreSyncTarget(nv));
+    return registerNiiVueEvents(nv, createStoreSyncTarget(nv));
   }, []);
 
   const {
     viewerOptions,
     applyViewerOptions,
-    syncViewerOptionsFromNiivue,
+    syncViewerOptionsFromNiiVue,
     debouncedGLUpdate,
   } = useViewerOptions(nvRef, true);
   const { handleLocationChange } = useLocation(nvRef);
-  useVolumes(
-    nvRef,
-    debouncedGLUpdate,
-    noopSurface,
-  );
-  const {
-    fileInputRef,
-    handleFileUpload,
-    handleFileChange,
-  } = useFileLoading(
+  useVolumes(nvRef, debouncedGLUpdate, noopSurface);
+  const { fileInputRef, handleFileUpload, handleFileChange } = useFileLoading(
     nvRef,
     applyViewerOptions,
-    syncViewerOptionsFromNiivue,
+    syncViewerOptionsFromNiiVue,
     () => {},
     handleLocationChange,
   );
@@ -69,7 +61,9 @@ export default function QaViewer() {
           <div className="rounded-full bg-background p-3 shadow-sm">
             <PanelRight className="h-10 w-10 text-muted-foreground" />
           </div>
-          <p className="text-lg font-semibold">Initiate QA process using the sidebar on the right</p>
+          <p className="text-lg font-semibold">
+            Initiate QA process using the sidebar on the right
+          </p>
         </div>
       }
     />

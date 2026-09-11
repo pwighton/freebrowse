@@ -1,19 +1,19 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { NiiVueGPU } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
 import { useVolumes } from "./use-volumes";
 
 type VolRef = Parameters<typeof useVolumes>[0];
-const refOf = (nv: NiiVueGPU) => ({ current: nv }) as unknown as VolRef;
+const refOf = (nv: NiiVue) => ({ current: nv }) as unknown as VolRef;
 const noop = () => {};
 
 const colormapEvent = (value: string) =>
   ({ target: { value } }) as unknown as React.ChangeEvent<HTMLSelectElement>;
 
 function volumeAt0() {
-  const nv = new NiiVueGPU();
+  const nv = new NiiVue();
   nv.volumes.push({ id: "vol-0", colormap: "gray", opacity: 1 });
   useFreeBrowseStore.setState({ currentImageIndex: 0 });
   return nv;
@@ -68,7 +68,7 @@ describe("useVolumes — visibility toggle (opacity, by id)", () => {
   });
 
   test("hides a visible volume via opacity 0", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", opacity: 1 });
     const spy = vi.spyOn(nv, "setVolume");
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
@@ -77,7 +77,7 @@ describe("useVolumes — visibility toggle (opacity, by id)", () => {
   });
 
   test("shows a hidden volume via opacity 1", () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", opacity: 0 });
     const spy = vi.spyOn(nv, "setVolume");
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
@@ -92,7 +92,7 @@ describe("useVolumes — edit volume as drawing", () => {
   });
 
   test("export -> removeVolume -> loadDrawing, carrying the colormap into pen mode", async () => {
-    const nv = new NiiVueGPU();
+    const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", name: "orig.nii" }); // background
     nv.volumes.push({ id: "vol-1", name: "seg.nii.gz", colormap: "roi_i256" }); // overlay to edit
     useFreeBrowseStore.setState({ currentImageIndex: 1 });

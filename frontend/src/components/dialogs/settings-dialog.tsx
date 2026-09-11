@@ -14,21 +14,35 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 
 interface SettingsDialogProps {
-  nvRef: React.RefObject<Niivue | null>;
+  nvRef: React.RefObject<NiiVue | null>;
 }
 
 export default function SettingsDialog({ nvRef }: SettingsDialogProps) {
   const settingsDialogOpen = useFreeBrowseStore((s) => s.settingsDialogOpen);
-  const setSettingsDialogOpen = useFreeBrowseStore((s) => s.setSettingsDialogOpen);
-  const skipRemoveConfirmation = useFreeBrowseStore((s) => s.skipRemoveConfirmation);
-  const setSkipRemoveConfirmation = useFreeBrowseStore((s) => s.setSkipRemoveConfirmation);
-  const skipImagingUploadConfirmation = useFreeBrowseStore((s) => s.skipImagingUploadConfirmation);
-  const setSkipImagingUploadConfirmation = useFreeBrowseStore((s) => s.setSkipImagingUploadConfirmation);
-  const skipSessionDeleteConfirmation = useFreeBrowseStore((s) => s.skipSessionDeleteConfirmation);
-  const setSkipSessionDeleteConfirmation = useFreeBrowseStore((s) => s.setSkipSessionDeleteConfirmation);
+  const setSettingsDialogOpen = useFreeBrowseStore(
+    (s) => s.setSettingsDialogOpen,
+  );
+  const skipRemoveConfirmation = useFreeBrowseStore(
+    (s) => s.skipRemoveConfirmation,
+  );
+  const setSkipRemoveConfirmation = useFreeBrowseStore(
+    (s) => s.setSkipRemoveConfirmation,
+  );
+  const skipImagingUploadConfirmation = useFreeBrowseStore(
+    (s) => s.skipImagingUploadConfirmation,
+  );
+  const setSkipImagingUploadConfirmation = useFreeBrowseStore(
+    (s) => s.setSkipImagingUploadConfirmation,
+  );
+  const skipSessionDeleteConfirmation = useFreeBrowseStore(
+    (s) => s.skipSessionDeleteConfirmation,
+  );
+  const setSkipSessionDeleteConfirmation = useFreeBrowseStore(
+    (s) => s.setSkipSessionDeleteConfirmation,
+  );
 
   const {
     viewerOptions,

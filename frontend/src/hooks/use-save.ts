@@ -2,9 +2,9 @@ import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
 import { uint8ArrayToBase64 } from "@/lib/niivue-helpers";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
-import type { NiiVueGPU as Niivue } from "@niivue/niivue";
+import type { NiiVue as NiiVue } from "@niivue/niivue";
 
-export function useSave(nvRef: React.RefObject<Niivue | null>) {
+export function useSave(nvRef: React.RefObject<NiiVue | null>) {
   const saveDialogOpen = useFreeBrowseStore((s) => s.saveDialogOpen);
   const setSaveDialogOpen = useFreeBrowseStore((s) => s.setSaveDialogOpen);
   const saveState = useFreeBrowseStore((s) => s.saveState);
