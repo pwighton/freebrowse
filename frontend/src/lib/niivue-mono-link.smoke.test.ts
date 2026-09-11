@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
 
-// Phase 2a smoke test: verify the file:-linked niivue-mono build resolves and
-// loads, exposing the new API surface FreeBrowse will migrate onto. This file
-// deliberately does NOT mock "@niivue/niivue" (unlike the app's unit tests), so
-// it imports the real linked bundle. Safe to delete once the app compiles
-// against the new API in 2b, or keep as a link-health check.
+// Health check on the real @niivue/niivue package: verify the pinned registry
+// build resolves and exposes the API surface FreeBrowse compiles against. This
+// file deliberately does NOT mock "@niivue/niivue" (unlike the app's unit
+// tests), so it imports the actual published bundle -- which makes it the
+// pre-publish gate that the package is equivalent to what we developed on.
+// (Was a link check while the dependency was file:-linked to ../niivue-mono.)
 import NiiVue, { DRAG_MODE, SHOW_RENDER, SLICE_TYPE } from "@niivue/niivue";
 
-describe("niivue-mono link (Phase 2a smoke)", () => {
+describe("@niivue/niivue package smoke", () => {
   test("default export is the NiiVue controller class", () => {
     expect(typeof NiiVue).toBe("function");
   });
