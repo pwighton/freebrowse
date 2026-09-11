@@ -1,31 +1,8 @@
 #!/usr/bin/env python3
 """Migrate legacy FreeBrowse .nvd documents to niivue-mono's NVDocumentData v8.
 
-Old FreeBrowse `.nvd` files are JSON with a flat, FreeBrowse-specific shape
-(`imageOptionsArray`, `meshes`, optionally embedded `encodedImageBlobs` /
-`meshesString` / `encodedDrawingBlob`). niivue-mono uses a completely different
-document schema (`scene` / `layout` / `volumes` / `meshes` / ...), normally
-CBOR-encoded. FreeBrowse loads it as JSON via a lossless tagged encoding
-(see `frontend/src/lib/nvd-json.ts`); this script emits that same JSON so the
-migrated document loads straight into the current app. With `--cbor` it instead
-emits the binary CBOR form that vanilla niivue-mono / ipyniivue read natively.
-
-Design goals (locked with Paul):
-  * The URL-referencing path (the vast majority of legacy docs) uses ONLY the
-    Python standard library, so it runs on a bare interpreter with no pip
-    installs.
-  * `--cbor` output lazily imports the optional `cbor2` package.
-  * Embedded / full-export docs are handled by `migrate_nvd_embedded` (see the
-    companion module split at 5d); they still emit stdlib-only JSON.
-
-JSON tag convention (mirror of `toJsonSafe`/`fromJsonSafe` in nvd-json.ts):
-  * bytes            -> {"$nvd": "ta",  "type": "Uint8Array"|..., "b64": "..."}
-  * non-finite float -> {"$nvd": "num", "v": "NaN"|"Infinity"|"-Infinity"}
-Untagged finite values are emitted as-is (FreeBrowse's reviver passes them
-through unchanged). URL-only docs contain no bytes and rarely any non-finite
-number, so their JSON is usually plain — but we always run the tag walk so the
-skeleton's `mesh.thicknessOn2D = Infinity` (and any embedded 5d data) round-trips
-losslessly.
+Migrate niivue documents from the old convention (up to @niivue/niivue-v0.69.0)
+to the new convention (aka niivue-mono since niivue@1.0.0-rc.2)
 
 Usage:
     migrate-nvd.py INPUT [INPUT ...] [-o OUTDIR] [--cbor] [--assets-dir DIR] [-v]
@@ -106,6 +83,24 @@ def _num(value):
         except ValueError:
             return value
     return value
+
+
+def _canonical_colormap(name):
+    """Canonicalize a colormap name to niivue-mono's stored form.
+
+    niivue-mono keys every colormap as `name[0].toUpperCase() + name[1:]`
+    (buildLutIndex / lookupColorMap / addColormap all apply this exact rule), and
+    exact-case consumers — including FreeBrowse's own `<select>` colormap picker —
+    match against that canonical name. Legacy FreeBrowse docs stored lowercase
+    names (`gray`, `freesurfer`), which then fail to match `Gray`/`Freesurfer` and
+    display as the wrong entry. Emitting the canonical case here keeps migrated
+    documents portable across the niivue ecosystem. This mirrors niivue's rule
+    verbatim (first char upper, remainder untouched) so it lands on the same key
+    niivue derives from the lowercase LUT filenames.
+    """
+    if not isinstance(name, str) or not name:
+        return name
+    return name[0].upper() + name[1:]
 
 
 # --- JSON tag walk (mirror of toJsonSafe in nvd-json.ts) ----------------------
@@ -196,9 +191,9 @@ def transform_volume(old: dict) -> dict:
     if old.get("name"):
         vol["name"] = old["name"]
     if old.get("colormap"):
-        vol["colormap"] = old["colormap"]
+        vol["colormap"] = _canonical_colormap(old["colormap"])
     if old.get("colormapNegative"):
-        vol["colormapNegative"] = old["colormapNegative"]
+        vol["colormapNegative"] = _canonical_colormap(old["colormapNegative"])
     # niivue-mono volumes have no `visible` flag; hide via opacity 0 (mirrors the
     # mesh visibility-via-opacity convention).
     opacity = _num(old.get("opacity", 1.0))
@@ -224,16 +219,17 @@ def transform_layer(old: dict) -> dict:
     if old.get("name"):
         layer["name"] = old["name"]
     if old.get("colormap"):
-        layer["colormap"] = old["colormap"]
+        layer["colormap"] = _canonical_colormap(old["colormap"])
     if "cal_min" in old:
         layer["calMin"] = _num(old["cal_min"])
     if "cal_max" in old:
         layer["calMax"] = _num(old["cal_max"])
     if "opacity" in old:
         layer["opacity"] = _num(old["opacity"])
-    # Old boolean flag -> a negative colormap name. FreeBrowse used 'winter'.
+    # Old boolean flag -> a negative colormap name. FreeBrowse used 'winter'
+    # (canonical 'Winter' so the picker matches).
     if old.get("useNegativeCmap"):
-        layer["colormapNegative"] = "winter"
+        layer["colormapNegative"] = "Winter"
     return layer
 
 
