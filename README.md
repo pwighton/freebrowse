@@ -306,8 +306,12 @@ for examples on how to use niivue directly inside jupyter
 
 ### Development
 
-If you make changes to the frontend, you will have to rebuild the `jupyter` before
-they become visible in Jupyter notebooks.
+The FreeBrowse bundle served inside JupyterLab
+(`jupyter/jupyterlab_freebrowse/static/freebrowse/`) is a build output and is
+**not committed**: a fresh checkout has to generate it before installing the
+extension, and any frontend change needs it regenerated before it becomes
+visible in notebooks. (The server extension logs a warning at startup if the
+bundle is missing.)
 
 ```bash
 cd frontend
