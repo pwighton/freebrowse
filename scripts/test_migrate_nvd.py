@@ -1,4 +1,4 @@
-"""pytest for migrate_nvd_embedded.py and the scene carry-over in migrate-nvd.py.
+"""pytest for scripts/migrate-nvd.py and scripts/migrate_nvd_embedded.py.
 
 Run:  python3 -m pytest scripts/
 
@@ -336,3 +336,181 @@ def test_default_output_is_tagged_with_target_version():
 def test_outdir_output_keeps_the_stem(tmp_path):
     out = migrate_nvd._output_path("/a/b/scene.nvd", str(tmp_path), False)
     assert out == str(tmp_path / "scene.nvd")
+
+
+# --- URL-path transforms -------------------------------------------------------
+
+
+def test_transform_volume_remaps_fields_and_ignores_visible():
+    vol = migrate_nvd.transform_volume({
+        "url": "https://x/aseg.mgz", "name": "aseg.mgz", "colormap": "freesurfer",
+        "colormapNegative": "winter", "opacity": 0.7, "visible": False,
+        "cal_min": 0, "cal_max": 255, "cal_minNeg": "nan", "cal_maxNeg": -1.5,
+    })
+    assert vol["url"] == "https://x/aseg.mgz" and vol["name"] == "aseg.mgz"
+    assert vol["colormap"] == "Freesurfer" and vol["colormapNegative"] == "Winter"
+    assert vol["opacity"] == 0.7  # `visible: false` must NOT zero it (mgz-surf-eg regression)
+    assert vol["calMin"] == 0 and vol["calMax"] == 255 and vol["calMaxNeg"] == -1.5
+    assert vol["calMinNeg"] is None  # dropped by to_json_safe
+    assert "visible" not in vol
+
+
+def test_transform_volume_defaults_opacity_and_omits_absent_fields():
+    vol = migrate_nvd.transform_volume({"url": "https://x/t1.nii.gz"})
+    assert vol == {"url": "https://x/t1.nii.gz", "opacity": 1.0}
+
+
+def test_transform_layer_negative_cmap_and_ranges():
+    layer = migrate_nvd.transform_layer({
+        "url": "https://x/lh.curv", "name": "lh.curv", "colormap": "nih",
+        "cal_min": -0.75, "cal_max": 0.75, "opacity": 1, "useNegativeCmap": True,
+    })
+    assert layer == {
+        "url": "https://x/lh.curv", "name": "lh.curv", "colormap": "Nih",
+        "calMin": -0.75, "calMax": 0.75, "opacity": 1, "colormapNegative": "Winter",
+    }
+    assert "colormapNegative" not in migrate_nvd.transform_layer({"url": "u", "useNegativeCmap": False})
+
+
+def test_transform_mesh_color_shader_and_layers():
+    mesh = migrate_nvd.transform_mesh({
+        "url": "https://x/lh.white", "name": "lh.white", "rgba255": [255, 255, 0, 255],
+        "meshShaderIndex": 14, "opacity": 0.5,
+        "layers": [{"url": "https://x/lh.curv", "cal_min": -1, "cal_max": 1}],
+    })
+    assert mesh["color"] == [1.0, 1.0, 0.0, 1.0]
+    assert mesh["shaderType"] == "crosscut"
+    assert mesh["opacity"] == 0.5
+    assert mesh["layers"] == [{"url": "https://x/lh.curv", "calMin": -1, "calMax": 1}]
+
+
+@pytest.mark.parametrize("index,name", [(0, "phong"), (1, "matte"), (14, "crosscut"), (None, "phong")])
+def test_shader_table(index, name, capsys):
+    assert migrate_nvd.shader_name(index) == name
+    assert "no niivue-mono equivalent" not in capsys.readouterr().err
+
+
+def test_unmapped_shader_index_falls_back_to_phong_with_warning(capsys):
+    assert migrate_nvd.shader_name(99) == "phong"
+    assert "meshShaderIndex 99" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("raw,canon", [
+    ("gray", "Gray"), ("freesurfer", "Freesurfer"), ("roi_i256", "Roi_i256"),
+    ("Gray", "Gray"), ("", ""), (None, None),
+])
+def test_canonical_colormap(raw, canon):
+    assert migrate_nvd._canonical_colormap(raw) == canon
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("nan", None), ("NaN", None), ("-infinity", None), ("inf", None), ("+Infinity", None),
+    (float("nan"), None), (float("-inf"), None),
+    ("1.5", 1.5), (2, 2), (0.0, 0.0), ("not-a-number", "not-a-number"), (None, None),
+])
+def test_num_drops_non_finite_and_coerces_numeric_strings(value, expected):
+    out = migrate_nvd._num(value)
+    assert out == expected and type(out) is type(expected)
+
+
+# --- classifiers ---------------------------------------------------------------
+
+
+def test_is_embedded_document_tests_values_not_key_presence():
+    empty_full_export = {"encodedImageBlobs": [], "encodedDrawingBlob": "",
+                         "meshesString": "[[1,[]]]", "previewImageDataURL": "",
+                         "imageOptionsArray": [{"url": "https://x/a.nii.gz"}]}
+    assert migrate_nvd.is_embedded_document(empty_full_export) is False
+    assert migrate_nvd.is_embedded_document({"encodedImageBlobs": ["", "AAAA"]}) is True
+    assert migrate_nvd.is_embedded_document({"encodedDrawingBlob": "AAAA"}) is True
+    assert migrate_nvd.is_embedded_document({"meshesString": json.dumps([{"url": "u"}])}) is True
+    assert migrate_nvd.is_embedded_document({"meshesString": "{not json"}) is True  # routed for attention
+    assert migrate_nvd.is_embedded_document({"imageOptionsArray": []}) is False
+
+
+@pytest.mark.parametrize("doc,expected", [
+    ({"version": 9}, True), ({"version": 8.0}, True), ({"version": "9"}, False),
+    ({"version": True}, False), ({"imageOptionsArray": []}, False),
+])
+def test_is_already_migrated(doc, expected):
+    assert migrate_nvd.is_already_migrated(doc) is expected
+
+
+def test_legacy_nan_calMinNeg_is_omitted_from_json_output():
+    doc = {"imageOptionsArray": [{"url": "https://x/a.nii.gz", "cal_minNeg": "nan",
+                                  "cal_maxNeg": "-infinity", "cal_min": 1}]}
+    out = migrate_nvd.to_json_safe(migrate_nvd.migrate_document(doc))
+    vol = out["volumes"][0]
+    assert "calMinNeg" not in vol and "calMaxNeg" not in vol and vol["calMin"] == 1
+    json.dumps(out, allow_nan=False)  # must not raise
+
+
+def test_url_document_drops_opts_with_warning(capsys):
+    out = migrate_nvd.migrate_document({"imageOptionsArray": [], "opts": {"sliceType": 3}})
+    assert out["volumes"] == [] and "opts" not in out
+    assert "'opts' block dropped" in capsys.readouterr().err
+
+
+# --- CLI -----------------------------------------------------------------------
+
+
+def _write(path, obj):
+    with open(path, "w") as f:
+        json.dump(obj, f)
+
+
+def test_collect_inputs_recurses_directories_and_expands_globs(tmp_path):
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    _write(tmp_path / "top.nvd", {})
+    _write(tmp_path / "a" / "b" / "deep.NVD", {})
+    _write(tmp_path / "a" / "other.txt", {})
+    found = sorted(os.path.relpath(p, tmp_path) for p in migrate_nvd._collect_inputs([str(tmp_path)]))
+    assert found == ["a/b/deep.NVD", "top.nvd"]
+    globbed = migrate_nvd._collect_inputs([str(tmp_path / "**" / "*.nvd")])
+    assert [os.path.basename(p) for p in globbed] == ["top.nvd"]
+
+
+def test_cli_end_to_end_default_naming_skip_and_exit_codes(tmp_path, capsys):
+    v = migrate_nvd.DOCUMENT_VERSION
+    _write(tmp_path / "scene.nvd", {"imageOptionsArray": [{"url": "https://x/t1.nii.gz", "name": "t1"}],
+                                    "meshes": [{"url": "https://x/lh.pial", "meshShaderIndex": 1}]})
+    _write(tmp_path / "done.nvd", {"version": v, "volumes": [], "meshes": []})
+
+    assert migrate_nvd.main([str(tmp_path), "-v"]) == 0
+    err = capsys.readouterr()
+    out_file = tmp_path / f"scene.v{v}.nvd"
+    assert out_file.exists()
+    assert not (tmp_path / f"done.v{v}.nvd").exists()
+    assert "already niivue-mono format" in err.err
+    assert f"(1 volumes [0 embedded], 1 meshes)" in err.out
+    migrated = json.load(open(out_file))
+    assert migrated["version"] == v
+    assert migrated["volumes"][0]["url"] == "https://x/t1.nii.gz"
+    assert migrated["meshes"][0]["shaderType"] == "matte"
+
+    # Second run: the v9 output and the pre-migrated file are skipped; the legacy
+    # input is regenerated to identical content apart from the `created` stamp
+    # (the default naming never touches an original, so re-running is safe).
+    without_created = lambda d: {k: v for k, v in d.items() if k != "created"}  # noqa: E731
+    before = without_created(json.load(open(out_file)))
+    assert migrate_nvd.main([str(tmp_path)]) == 0
+    assert without_created(json.load(open(out_file))) == before
+    assert "2 file(s) already migrated" in capsys.readouterr().err
+
+    # A broken file fails that file only and makes the exit code non-zero.
+    (tmp_path / "broken.nvd").write_text("{not json")
+    assert migrate_nvd.main([str(tmp_path)]) == 1
+    assert "1 file(s) failed" in capsys.readouterr().err
+
+
+def test_cli_outdir_writes_flat_stem_names(tmp_path):
+    src = tmp_path / "in"; src.mkdir()
+    out = tmp_path / "out"
+    _write(src / "scene.nvd", {"imageOptionsArray": []})
+    assert migrate_nvd.main([str(src), "-o", str(out)]) == 0
+    assert sorted(os.listdir(out)) == ["scene.nvd"]
+
+
+def test_cli_no_inputs_is_an_error(capsys):
+    assert migrate_nvd.main(["/nonexistent/path/*.nvd"]) == 1
+    assert "no input files" in capsys.readouterr().err
