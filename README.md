@@ -198,7 +198,7 @@ variables. These are read-only at runtime.
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `VITE_DISABLE_DOWNLOAD` | `true` / unset | Disables the **Download** button and no-ops niivue's save-to-disk methods (`saveImage`, `saveDocument`, `saveScene`, `saveHTML`, `saveToDisk`). For deploying into secure environments where local data export should be turned off. |
+| `VITE_DISABLE_DOWNLOAD` | `true` / unset | Disables the **Download** button and no-ops niivue's save-to-disk methods (`saveMesh`, `saveBitmap`, `saveDocument`, and `saveVolume` / `saveDrawing` whenever they are given a filename). In-memory exports (`saveVolume({filename: ""})`, `serializeDocument()`) keep working, so backend **Save**, AI sessions, save-drawing and edit-volume are unaffected. For deploying into secure environments where local data export should be turned off. |
 | `VITE_SERVERLESS` | `true` / unset | Builds for the `file://` protocol with no backend (set automatically by `build:serverless`). Also disables the backend **Save** button. |
 | `VITE_BASE_PATH` | e.g. `/freebrowse/` | Base URL path for routing/assets. |
 
