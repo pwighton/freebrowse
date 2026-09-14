@@ -15,7 +15,7 @@ describe("useFileLoading — loadNvdData", () => {
     const nv = new NiiVue();
     const load = vi.spyOn(nv, "loadDocument");
     const { result } = renderHook(() =>
-      useFileLoading(refOf(nv), noop, noop, noop, noop),
+      useFileLoading(refOf(nv), noop, noop, noop),
     );
     const bytes = new TextEncoder().encode(JSON.stringify(V9_DOC));
     await act(() => result.current.loadNvdData(bytes));
@@ -28,7 +28,7 @@ describe("useFileLoading — loadNvdData", () => {
     const nv = new NiiVue();
     const load = vi.spyOn(nv, "loadDocument");
     const { result } = renderHook(() =>
-      useFileLoading(refOf(nv), noop, noop, noop, noop),
+      useFileLoading(refOf(nv), noop, noop, noop),
     );
     await act(() => result.current.loadNvdData(V9_DOC));
     expect(load.mock.calls[0][1]).toEqual({ fill: "current" });
@@ -38,7 +38,7 @@ describe("useFileLoading — loadNvdData", () => {
     const nv = new NiiVue();
     const load = vi.spyOn(nv, "loadDocument");
     const { result } = renderHook(() =>
-      useFileLoading(refOf(nv), noop, noop, noop, noop),
+      useFileLoading(refOf(nv), noop, noop, noop),
     );
     const legacy = new TextEncoder().encode(
       JSON.stringify({ encodedImageBlobs: ["AAAA"], imageOptionsArray: [] }),

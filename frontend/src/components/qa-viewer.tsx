@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { registerNiiVueEvents } from "@/store/niivue-sync";
 import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
-import { useLocation } from "@/hooks/use-location";
 import { useVolumes } from "@/hooks/use-volumes";
 import { useFileLoading } from "@/hooks/use-file-loading";
 import { NiiVue } from "@niivue/niivue";
@@ -13,7 +12,6 @@ import QaSidebar from "./qa-sidebar";
 import SettingsDialog from "./dialogs/settings-dialog";
 
 const nv = new NiiVue({
-  // MIGRATION-TODO(P2): tune fontScale (was textHeight=0.02, different units).
   backend: "webgl2", // pin during migration; auto-select in P6
   placeholderText: "",
   isDragDropEnabled: false,
@@ -39,14 +37,12 @@ export default function QaViewer() {
     syncViewerOptionsFromNiiVue,
     debouncedGLUpdate,
   } = useViewerOptions(nvRef, true);
-  const { handleLocationChange } = useLocation(nvRef);
   useVolumes(nvRef, debouncedGLUpdate, noopSurface);
   const { fileInputRef, handleFileUpload, handleFileChange } = useFileLoading(
     nvRef,
     applyViewerOptions,
     syncViewerOptionsFromNiiVue,
     () => {},
-    handleLocationChange,
   );
 
   return (

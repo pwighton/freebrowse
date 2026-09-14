@@ -54,7 +54,6 @@ export default function SettingsDialog({ nvRef }: SettingsDialogProps) {
     handleOverlayOutlineWidthChange,
     handleColorbarChange,
     handleRadiologicalChange,
-    handleSagittalNoseLeftChange,
   } = useViewerOptions(nvRef);
 
   return (
@@ -224,21 +223,10 @@ export default function SettingsDialog({ nvRef }: SettingsDialogProps) {
                 </Label>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="sagittal-nose-left"
-                  checked={viewerOptions.sagittalNoseLeft}
-                  onCheckedChange={(checked) =>
-                    handleSagittalNoseLeftChange(checked as boolean)
-                  }
-                />
-                <Label
-                  htmlFor="sagittal-nose-left"
-                  className="text-sm font-medium"
-                >
-                  Sagittal Nose on Left
-                </Label>
-              </div>
+              {/* "Sagittal Nose on Left" is hidden: niivue-mono has no such
+                  option (migration plan Step 8, item 8j). The store field and
+                  `handleSagittalNoseLeftChange` are kept so the toggle can be
+                  restored once upstream supports it. */}
 
               <div className="flex items-center space-x-2">
                 <Checkbox

@@ -56,7 +56,6 @@ export function useFileLoading(
   applyViewerOptions: () => void,
   syncViewerOptionsFromNiiVue: () => void,
   updateSurfaceDetails: () => void,
-  handleLocationChange: (locationObject: any) => void,
 ) {
   const showUploader = useFreeBrowseStore((s) => s.showUploader);
   const setShowUploader = useFreeBrowseStore((s) => s.setShowUploader);
@@ -370,8 +369,10 @@ export function useFileLoading(
     ],
   );
 
-  // Set up NiiVue event listeners (niivue-mono uses the EventTarget API rather
-  // than assignable onXxx callback props).
+  // Re-read the volume list after a drag ends (niivue-mono uses the EventTarget
+  // API rather than assignable onXxx callback props). The crosshair readout is
+  // NOT handled here: `locationChange` reaches the store through the event
+  // adapter (niivue-store-sync `onLocationChange`), the single path for it.
   useEffect(() => {
     const nv = nvRef.current;
     if (!nv) return;
@@ -379,17 +380,12 @@ export function useFileLoading(
     const onDragRelease = () => {
       requestAnimationFrame(() => incrementVolumeVersion());
     };
-    const onLocationChange = (e: Event) =>
-      handleLocationChange((e as CustomEvent).detail);
 
     nv.addEventListener("dragRelease", onDragRelease);
-    nv.addEventListener("locationChange", onLocationChange);
-
     return () => {
       nv.removeEventListener("dragRelease", onDragRelease);
-      nv.removeEventListener("locationChange", onLocationChange);
     };
-  }, [nvRef, handleLocationChange, incrementVolumeVersion]);
+  }, [nvRef, incrementVolumeVersion]);
 
   // Enable/disable drag-and-drop based on whether volumes are loaded
   useEffect(() => {

@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { registerNiiVueEvents } from "@/store/niivue-sync";
 import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
-import { useLocation } from "@/hooks/use-location";
 import { useVolumes } from "@/hooks/use-volumes";
 import { useSurfaces } from "@/hooks/use-surfaces";
 import { useMeshLayers } from "@/hooks/use-mesh-layers";
@@ -27,7 +26,6 @@ import ImagingUploadConfirmationDialog from "./dialogs/imaging-upload-confirmati
 import SessionDeleteConfirmationDialog from "./dialogs/session-delete-confirmation-dialog";
 
 const nv = new NiiVue({
-  // MIGRATION-TODO(P2): tune fontScale (was textHeight=0.02, different units).
   backend: "webgl2", // pin during migration; auto-select in P6
   placeholderText: "Drag-drop images",
   isDragDropEnabled: true,
@@ -55,7 +53,6 @@ export default function FreeBrowse() {
     syncViewerOptionsFromNiiVue,
     debouncedGLUpdate,
   } = useViewerOptions(nvRef, true);
-  const { handleLocationChange } = useLocation(nvRef);
   const {
     updateSurfaceDetails,
     toggleSurfaceVisibility,
@@ -136,7 +133,6 @@ export default function FreeBrowse() {
     applyViewerOptions,
     syncViewerOptionsFromNiiVue,
     updateSurfaceDetails,
-    handleLocationChange,
   );
 
   useAiCapabilities();

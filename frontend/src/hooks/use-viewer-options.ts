@@ -178,8 +178,9 @@ export function useViewerOptions(
 
   const handleSagittalNoseLeftChange = useCallback(
     (checked: boolean) => {
-      // MIGRATION-TODO(P2): sagittalNoseLeft has no niivue-mono equivalent; the
-      // Settings toggle is being retired. Store-only and inert.
+      // niivue-mono has no sagittal nose-left option (upstream request: migration
+      // plan Step 8, item 8j). The Settings toggle is hidden meanwhile; this
+      // handler and the store field stay so it can be re-enabled. Store-only.
       setViewerOptions((prev) => ({ ...prev, sagittalNoseLeft: checked }));
     },
     [setViewerOptions],

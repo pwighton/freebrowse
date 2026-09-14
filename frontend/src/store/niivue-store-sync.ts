@@ -212,8 +212,10 @@ export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
     },
 
     onDocumentLoaded() {
-      // MIGRATION-TODO(P5): documents phase — bump both so volume + surface UI
-      // re-read after a document loads.
+      // A document load adds volumes/meshes without per-item events, so bump
+      // both versions to make the volume + surface UI re-read. Settings the
+      // document applied are NOT resynced here: that waits on upstream `change`
+      // events for loadDocument (migration plan Step 8, item 8d).
       store().incrementVolumeVersion();
       store().incrementLayerVersion();
     },
