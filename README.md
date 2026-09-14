@@ -36,6 +36,69 @@ Try out the 'serverless' version: [https://freesurfer.github.io/freebrowse/](htt
 - [FastAPI](https://fastapi.tiangolo.com) (Python web framework)
 - [Pixi](https://pixi.sh) (package manager)
 
+## NiiVue documents (`.nvd`)
+
+A FreeBrowse scene is a plain [NiiVue document](https://github.com/niivue/mono/blob/main/packages/niivue/src/NVDocument.ts)
+(`NVDocumentData`, schema version 9).
+
+The **Download** dialog writes it as JSON (text) or CBOR (binary);
+loading detects the encoding, so either can be passed to `?nvd=`, dropped onto
+the viewer, or embedded in a single-file build.
+
+- **Downloaded documents are self-contained**: every volume's voxels are embedded
+  (`volumes[i].data`), so the file stands alone. Meshes are embedded as geometry
+  too, but mesh *overlays* (curvature, thickness) are not yet persisted — see
+  [#43](https://github.com/freesurfer/freebrowse/issues/43).
+- **Saved-to-backend documents are linked**: volumes are uploaded as `.nii.gz`
+  and the document references them by URL. The one FreeBrowse-specific save
+  behaviour is `retargetVolumeUrls` (`frontend/src/lib/nvd-volume-urls.ts`),
+  which points each volume entry at the path it is being uploaded to; a volume
+  given no destination keeps its bytes.
+- **Loading changes only what the document sets.** FreeBrowse loads with
+  niivue's `fill: "current"` policy, so a document that says nothing about,
+  say, the crosshair colour or the view layout leaves the current viewer
+  settings alone.
+
+**Documents from FreeBrowse ≤ 2.4 (classic niivue) do not load** — the viewer
+reports *"This .nvd predates the niivue document schema"*. Convert them once
+with the stdlib-only migration script, which writes `<name>.v9.nvd` next to
+each input (originals are never touched) and handles documents with embedded
+volumes:
+
+```bash
+python3 scripts/migrate-nvd.py path/to/docs/        # directory, file or glob
+python3 scripts/migrate-nvd.py scene.nvd --cbor     # binary output (needs cbor2)
+```
+
+`scripts/nvd-embed.py` embeds a document into a single-file build (see
+[Build](#build)), and `python3 -m pytest` runs the script's tests.
+
+## Driving FreeBrowse from your own code
+
+FreeBrowse's UI is a *derived view* of its NiiVue instance: the React store is
+updated only by the events niivue emits, and FreeBrowse's own controls go
+through the same path as any external caller. The live instance is exposed as
+`window.freebrowse.nv`, so from the browser console (or an embedding page) you
+can drive the viewer with niivue's API and watch the sidebar, toolbar and footer
+follow:
+
+```js
+const nv = window.freebrowse.nv;
+await nv.addVolume({ url: "https://niivue.com/demos/images/mni152.nii.gz" });
+await nv.setVolume(0, { colormap: "Hot", opacity: 0.8 });   // sidebar updates
+nv.sliceType = 4;                                            // toolbar switches to Render
+await nv.loadDocument(fileOrUrl);                            // document path, same events
+```
+
+**Supported mutations**: anything that emits an event: `setVolume(i, {...})`,
+`setMesh(i, {...})`, `setMeshLayerProperty`, `add`/`remove`/`move` methods, the
+flat setters (`sliceType`, `showRender`, `isRadiological`, `crosshairColor`,
+`drawOpacity`, …), the drawing API and `loadDocument`.
+
+**Not supported**: raw field writes such as `nv.volumes[0].colormap = "Hot"`.
+Niivue-mono volumes and meshes are plain objects, so nothing observes the write
+and the UI will not update.
+
 ## Install
 
 ### Pre-requisites
