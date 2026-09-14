@@ -12,7 +12,8 @@ import QaSidebar from "./qa-sidebar";
 import SettingsDialog from "./dialogs/settings-dialog";
 
 const nv = new NiiVue({
-  backend: "webgl2", // pin during migration; auto-select in P6
+  // No `backend` option: niivue picks WebGPU when `navigator.gpu` exists and
+  // falls back to WebGL2 otherwise (logging "WebGPU not available").
   placeholderText: "",
   isDragDropEnabled: false,
   backgroundColor: [0, 0, 0, 1],

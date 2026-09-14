@@ -26,7 +26,8 @@ import ImagingUploadConfirmationDialog from "./dialogs/imaging-upload-confirmati
 import SessionDeleteConfirmationDialog from "./dialogs/session-delete-confirmation-dialog";
 
 const nv = new NiiVue({
-  backend: "webgl2", // pin during migration; auto-select in P6
+  // No `backend` option: niivue picks WebGPU when `navigator.gpu` exists and
+  // falls back to WebGL2 otherwise (logging "WebGPU not available").
   placeholderText: "Drag-drop images",
   isDragDropEnabled: true,
   backgroundColor: [0, 0, 0, 1],
