@@ -338,10 +338,16 @@ export class NiiVue extends EventTarget {
   }
 
   // --- documents & colormaps ---
-  async loadDocument(source: unknown): Promise<void> {
+  async loadDocument(
+    source: unknown,
+    options?: { fill?: unknown },
+  ): Promise<void> {
     void source;
+    this.lastLoadDocumentOptions = options;
     this.emit("documentLoaded");
   }
+  /** Last options passed to `loadDocument`, for test assertions. */
+  lastLoadDocumentOptions?: { fill?: unknown };
   serializeDocument(options?: {
     format?: "cbor" | "json";
     linkData?: boolean;

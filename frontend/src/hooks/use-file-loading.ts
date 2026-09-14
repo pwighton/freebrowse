@@ -109,7 +109,12 @@ export function useFileLoading(
         });
       }
 
-      await nv.loadDocument(file);
+      // `fill: "current"`: a setting the document OMITS keeps the instance's
+      // value. v9 documents are sparse (a setting equal to its default is not
+      // written), and niivue's default policy would reset every omitted setting
+      // to its built-in default, silently changing e.g. crosshair colour or view
+      // mode on every load. A document should only change what it sets.
+      await nv.loadDocument(file, { fill: "current" });
       // Migrated legacy documents name label palettes by `colormap` only.
       await applyLabelColormapsAfterLoad(nv);
 
