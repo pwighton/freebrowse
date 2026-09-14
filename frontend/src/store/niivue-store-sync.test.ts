@@ -5,7 +5,7 @@ import {
   NiiVue,
   SHOW_RENDER,
   SLICE_TYPE,
-} from "@/__mocks__/niivue.v2";
+} from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
 import { registerNiiVueEvents } from "./niivue-sync";
 import { createStoreSyncTarget } from "./niivue-store-sync";

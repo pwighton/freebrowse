@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { NiiVue } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
 import { useMeshLayers } from "./use-mesh-layers";
 

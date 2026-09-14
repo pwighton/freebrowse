@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { NiiVue } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue";
 import { registerNiiVueEvents, type NiiVueSyncTarget } from "./niivue-sync";
 
 function makeTarget() {

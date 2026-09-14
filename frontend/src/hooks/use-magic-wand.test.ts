@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 vi.mock("@niivue/nv-ext-drawing", () => ({ magicWand: vi.fn() }));
 
 import { magicWand } from "@niivue/nv-ext-drawing";
-import { NiiVue } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
 import type { DrawingOptions } from "@/store/types";
 import { runMagicWand, useMagicWand } from "./use-magic-wand";

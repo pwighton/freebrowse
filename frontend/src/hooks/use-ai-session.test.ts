@@ -7,7 +7,7 @@ vi.mock("@/lib/confirmations", () => ({
   requestSessionDeleteConfirmation: vi.fn(async () => true),
 }));
 
-import { NiiVue } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
 import type { AiSessionSummary } from "@/store/ai-slice";
 import { useAiSession } from "./use-ai-session";

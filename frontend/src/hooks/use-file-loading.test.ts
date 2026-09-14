@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
-import { NiiVue } from "@/__mocks__/niivue.v2";
+import { NiiVue } from "@/__mocks__/niivue";
 import { useFileLoading } from "./use-file-loading";
 
 type LoadRef = Parameters<typeof useFileLoading>[0];

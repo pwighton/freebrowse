@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("@niivue/niivue", () => import("@/__mocks__/niivue.v2"));
+vi.mock("@niivue/niivue", () => import("@/__mocks__/niivue"));
 
 import { NiiVue } from "@niivue/niivue";
 import { applyExportLockdown } from "./disable-export";
