@@ -363,7 +363,6 @@ export function useFileLoading(
       nvRef,
       showUploader,
       currentSurfaceIndex,
-      updateSurfaceDetails,
       setShowUploader,
       setCurrentSurfaceIndex,
     ],
@@ -436,8 +435,8 @@ export function useFileLoading(
     const handleEmbeddedNvd = async (event: CustomEvent) => {
       if (!event.detail || !nvRef.current) return;
 
-      if ((window as any).__EMBEDDED_NVD_LOADED__) return;
-      (window as any).__EMBEDDED_NVD_LOADED__ = true;
+      if (window.__EMBEDDED_NVD_LOADED__) return;
+      window.__EMBEDDED_NVD_LOADED__ = true;
 
       console.log("Loading embedded NVD data");
       setShowUploader(false);
@@ -458,13 +457,10 @@ export function useFileLoading(
       handleEmbeddedNvd as unknown as EventListener,
     );
 
-    if (
-      (window as any).__EMBEDDED_NVD_DATA__ &&
-      !(window as any).__EMBEDDED_NVD_LOADED__
-    ) {
+    if (window.__EMBEDDED_NVD_DATA__ && !window.__EMBEDDED_NVD_LOADED__) {
       window.dispatchEvent(
         new CustomEvent("loadEmbeddedNvd", {
-          detail: (window as any).__EMBEDDED_NVD_DATA__,
+          detail: window.__EMBEDDED_NVD_DATA__,
         }),
       );
     }

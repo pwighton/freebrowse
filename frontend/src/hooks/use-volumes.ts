@@ -97,7 +97,7 @@ export function useVolumes(
       void nv.setVolume(currentImageIndex, { opacity: newOpacity });
       incrementVolumeVersion();
     },
-    [currentImageIndex, nvRef, debouncedGLUpdate, incrementVolumeVersion],
+    [currentImageIndex, nvRef, incrementVolumeVersion],
   );
 
   const handleFrameChange = useCallback(

@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { rgba255ToHex } from "@/lib/niivue-helpers";
-import type { NiiVue } from "@niivue/niivue";
+import type { NiiVue, NVMeshLayer } from "@niivue/niivue";
 
 interface SurfaceDetailsTabProps {
   nvRef: React.RefObject<NiiVue | null>;
@@ -19,7 +19,7 @@ interface SurfaceDetailsTabProps {
   onColorChange: (hexColor: string) => void;
   onShaderChange: (shaderName: string) => void;
   // Layer operations
-  getLayers: () => any[];
+  getLayers: () => NVMeshLayer[];
   onAddLayerFiles: () => void;
   onRemoveLayer: (index: number) => void;
   onLayerOpacityChange: (value: number) => void;
@@ -198,7 +198,7 @@ export default function SurfaceDetailsTab({
 
               {layers.length > 0 ? (
                 <div className="grid gap-1 mb-4">
-                  {layers.map((layer: any, index: number) => (
+                  {layers.map((layer, index) => (
                     <div
                       key={index}
                       className={cn(

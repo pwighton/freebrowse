@@ -38,7 +38,7 @@ export default function QaViewer() {
     debouncedGLUpdate,
   } = useViewerOptions(nvRef, true);
   useVolumes(nvRef, debouncedGLUpdate, noopSurface);
-  const { fileInputRef, handleFileUpload, handleFileChange } = useFileLoading(
+  const { handleFileUpload } = useFileLoading(
     nvRef,
     applyViewerOptions,
     syncViewerOptionsFromNiiVue,

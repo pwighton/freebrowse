@@ -156,7 +156,6 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
   }, [
     nvRef,
     drawingOptions.penValue,
-    drawingOptions.penFill,
     setDrawingOptions,
     setActiveTab,
   ]);

@@ -4,9 +4,6 @@ import { useRef, useEffect, useState } from "react";
 import { NiiVue } from "@niivue/niivue";
 import { sliceTypeMap } from "@/lib/niivue-helpers";
 
-// Re-export for backwards compatibility during refactor
-export { sliceTypeMap };
-
 interface ImageCanvasProps {
   viewMode: "axial" | "coronal" | "sagittal" | "ACS" | "ACSR" | "render";
   nvRef: NiiVue;
@@ -26,6 +23,9 @@ export default function ImageCanvas({ viewMode, nvRef }: ImageCanvasProps) {
     nv.attachToCanvas(canvas);
     nv.sliceType = sliceTypeMap[viewMode]?.sliceType || 0; // Default to axial if viewMode is invalid;
     setImageLoaded(true);
+    // Mount-once: attach the canvas exactly once. Later view-mode changes are
+    // applied through use-viewer-options, never by re-attaching.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const renderMultiView = () => {

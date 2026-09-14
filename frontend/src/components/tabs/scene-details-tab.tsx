@@ -19,12 +19,12 @@ import { LabeledSliderWithInput } from "@/components/ui/labeled-slider-with-inpu
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { deploymentConfig } from "@/lib/deployment-config";
-import type { NiiVue } from "@niivue/niivue";
+import type { NiiVue, NVImage } from "@niivue/niivue";
 
 interface SceneDetailsTabProps {
   nvRef: React.RefObject<NiiVue | null>;
   serverlessMode: boolean;
-  getVolumes: () => any[];
+  getVolumes: () => NVImage[];
   onToggleVisibility: (id: string) => void;
   onEditVolume: (index: number) => void;
   canEditVolume: (index: number) => boolean;
@@ -81,7 +81,7 @@ export default function SceneDetailsTab({
       <ScrollArea className="max-h-[50%] min-h-0">
         {volumes.length > 0 ? (
           <div className="grid gap-2 p-4">
-            {volumes.map((volume: any, index: number) => (
+            {volumes.map((volume, index) => (
               <div
                 key={volume.id}
                 className={cn(
@@ -99,10 +99,12 @@ export default function SceneDetailsTab({
                     className="h-6 w-6 p-0"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onToggleVisibility(volume.id);
+                      // niivue-mono assigns every loaded volume an id; the
+                      // type keeps it optional, so guard rather than assert.
+                      if (volume.id) onToggleVisibility(volume.id);
                     }}
                   >
-                    {volume.opacity > 0 ? (
+                    {(volume.opacity ?? 1) > 0 ? (
                       <Eye className="h-3 w-3" />
                     ) : (
                       <EyeOff className="h-3 w-3 opacity-50" />

@@ -108,7 +108,7 @@ export class NVImage {
 export class NVDocument {
   static loadFromJSON = vi.fn(() => {
     const doc = new NVDocument();
-    (doc as any).fetchLinkedData = vi.fn(() => Promise.resolve());
+    Object.assign(doc, { fetchLinkedData: vi.fn(() => Promise.resolve()) });
     return Promise.resolve(doc);
   });
   volumes: unknown[] = [];

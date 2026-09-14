@@ -42,7 +42,7 @@ export default function FreeBrowse() {
   // instance (window.freebrowse.nv) update the UI through the same path.
   useEffect(() => {
     const teardown = registerNiiVueEvents(nv, createStoreSyncTarget(nv));
-    (window as unknown as { freebrowse?: { nv: NiiVue } }).freebrowse = { nv };
+    window.freebrowse = { nv }; // typed in src/window.d.ts
     return teardown;
   }, []);
 

@@ -2,7 +2,7 @@ import { useFreeBrowseStore } from "@/store";
 import { FileText, Box, Brain, Database, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import type { NiiVue } from "@niivue/niivue";
+import type { NiiVue, NVImage, NVMeshLayer } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 import NvdTab from "@/components/tabs/nvd-tab";
 import DataTab from "@/components/tabs/data-tab";
@@ -21,7 +21,7 @@ interface SidebarProps {
   onAddMoreFiles: () => void;
   onAddSurfaceFiles: () => void;
   // Volume operations
-  getVolumes: () => any[];
+  getVolumes: () => NVImage[];
   onToggleImageVisibility: (id: string) => void;
   onEditVolume: (index: number) => void;
   canEditVolume: (index: number) => boolean;
@@ -40,7 +40,7 @@ interface SidebarProps {
   onSurfaceColorChange: (hexColor: string) => void;
   onMeshShaderChange: (shaderName: string) => void;
   // Layer operations
-  getLayers: () => any[];
+  getLayers: () => NVMeshLayer[];
   onAddLayerFiles: () => void;
   onRemoveLayer: (index: number) => void;
   onLayerOpacityChange: (value: number) => void;

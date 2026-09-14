@@ -25,7 +25,6 @@ function downloadBytes(bytes: Uint8Array | string, filename: string, type: strin
 }
 
 export function useSave(nvRef: React.RefObject<NiiVue | null>) {
-  const saveDialogOpen = useFreeBrowseStore((s) => s.saveDialogOpen);
   const setSaveDialogOpen = useFreeBrowseStore((s) => s.setSaveDialogOpen);
   const saveState = useFreeBrowseStore((s) => s.saveState);
   const setSaveState = useFreeBrowseStore((s) => s.setSaveState);
@@ -39,7 +38,7 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
         if (!ok) return;
       }
 
-      const volumeStates = nvRef.current.volumes.map((volume: any) => {
+      const volumeStates = nvRef.current.volumes.map((volume) => {
         const isExternal = !!(volume.url && volume.url.startsWith("http"));
         return {
           enabled: !isExternal,
