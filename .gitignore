@@ -9,6 +9,7 @@
 frontend/dist/
 frontend/dist-singlefile/
 frontend/dist-jupyter/
+frontend/dist-github/
 
 # Vite temp files
 *.timestamp-*.mjs
