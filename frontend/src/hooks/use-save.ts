@@ -2,6 +2,10 @@ import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
 import { uint8ArrayToBase64 } from "@/lib/niivue-helpers";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
+import {
+  asEmbeddedNiftiOptions,
+  imageOptionsForSavedVolume,
+} from "@/lib/nvd-saved-image-options";
 import type { Niivue } from "@niivue/niivue";
 
 export function useSave(nvRef: React.RefObject<Niivue | null>) {
@@ -55,6 +59,8 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
         delete jsonData.meshOptionsArray;
         delete jsonData.meshesString;
 
+        // Embedded blobs are always NIfTI (NVImage.toUint8Array), so record
+        // a NIfTI name and image type regardless of the source file format.
         if (jsonData.imageOptionsArray && nvRef.current.volumes) {
           for (
             let i = 0;
@@ -62,7 +68,9 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
             i < nvRef.current.volumes.length;
             i++
           ) {
-            jsonData.imageOptionsArray[i].url = "";
+            jsonData.imageOptionsArray[i] = asEmbeddedNiftiOptions(
+              jsonData.imageOptionsArray[i],
+            );
           }
         }
 
@@ -133,7 +141,8 @@ export function useSave(nvRef: React.RefObject<Niivue | null>) {
             (imageOption: any, index: number) => {
               const volumeState = saveState.volumes[index];
               if (volumeState?.enabled && volumeState.url.trim() !== "") {
-                return { ...imageOption, url: volumeState.url };
+                // The volume is written below as a NIfTI file at this url.
+                return imageOptionsForSavedVolume(imageOption, volumeState.url);
               }
               return imageOption;
             },
