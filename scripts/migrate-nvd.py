@@ -16,9 +16,16 @@ converter (packages/niivue/src/documentLegacy.ts, which reads meshes only from
 surface.
 
 Usage:
-    migrate-nvd.py INPUT [INPUT ...] [-o OUTDIR] [--cbor] [--assets-dir DIR] [-v]
+    migrate-nvd.py INPUT [INPUT ...] [-o OUTDIR] [--cbor] [-v]
 
 INPUT may be a file, a directory (recursed for *.nvd), or a glob.
+
+Embedded (full-export) documents -- `encodedImageBlobs` holding NIfTI bytes --
+are handled by the companion module migrate_nvd_embedded.py, which emits
+niivue-mono's own self-contained `volumes[i].data = {hdr, img, datatypeCode}`
+so the output stays one file. Mesh geometry embedded in `meshesString` is not
+migrated (deferred until after Step 8 of the migration plan; see
+freesurfer/freebrowse#43).
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ import json
 import math
 import os
 import sys
+import types
 from datetime import datetime, timezone
 
 # niivue-mono's current schema (NVConstants.NVD_DOCUMENT_VERSION). v8 -> v9 was
@@ -171,6 +179,64 @@ def _scene_defaults():
         "clipPlaneColor": [0.7, 0, 0.7, 0.4],
         "isClipPlaneCutaway": False,
     }
+
+
+def _vector(value, n):
+    """A legacy vec3/vec4 as a list of n finite numbers, or None.
+
+    Old niivue serialized gl-matrix vectors with JSON.stringify, which turns a
+    Float32Array into an OBJECT keyed "0".."n-1" (`{"0": 0.5, "1": 0.5, ...}`),
+    so both that and a plain array are accepted.
+    """
+    if isinstance(value, dict):
+        try:
+            value = [value[str(i)] for i in range(n)]
+        except KeyError:
+            return None
+    if not isinstance(value, (list, tuple)) or len(value) != n:
+        return None
+    nums = [_num(x) for x in value]
+    if not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in nums):
+        return None
+    return nums
+
+
+def transform_scene(scene_data) -> dict:
+    """Legacy `sceneData` -> v9 `scene`, overlaid on the defaults.
+
+    Old niivue's `sceneData` (SceneData in nvdocument.ts) and niivue-mono's
+    `scene` share the camera/crosshair fields under slightly different names:
+    `volScaleMultiplier` became `scaleMultiplier`; the rest are unchanged. Old
+    `clipPlanes` / `clipPlaneDepthAziElevs` are per-plane 4-vectors, while v9
+    `clipPlanes` is a flat number list with different semantics, so they are
+    not carried over (warned only when non-empty). Documents without
+    `sceneData` -- the whole URL corpus -- get the defaults, as before.
+    """
+    scene = _scene_defaults()
+    if not isinstance(scene_data, dict):
+        return scene
+    for old_key, new_key in (
+        ("azimuth", "azimuth"),
+        ("elevation", "elevation"),
+        ("gamma", "gamma"),
+        ("volScaleMultiplier", "scaleMultiplier"),
+    ):
+        if old_key in scene_data:
+            v = _num(scene_data[old_key])
+            if v is not None:
+                scene[new_key] = v
+    for key, n in (("crosshairPos", 3), ("pan2Dxyzmm", 4)):
+        nums = _vector(scene_data.get(key), n)
+        if nums is not None:
+            scene[key] = nums
+    for key in ("clipPlanes", "clipPlaneDepthAziElevs"):
+        v = scene_data.get(key)
+        if isinstance(v, list) and any(
+            isinstance(p, list) and any(x for x in p) for p in v
+        ):
+            _warn(f"legacy sceneData.{key} not carried over (v9 clip planes differ)")
+            break
+    return scene
 
 
 def new_document_skeleton(created: str | None = None):
@@ -338,6 +404,7 @@ def is_embedded_document(doc: dict) -> bool:
 def migrate_url_document(doc: dict, *, created: str | None = None) -> dict:
     """Transform a URL-referencing legacy doc into NVDocumentData v8 (untagged)."""
     out = new_document_skeleton(created=created)
+    out["scene"] = transform_scene(doc.get("sceneData"))
     out["volumes"] = [transform_volume(v) for v in doc.get("imageOptionsArray", [])]
     out["meshes"] = [transform_mesh(m) for m in doc.get("meshes", [])]
     if doc.get("opts"):
@@ -355,17 +422,17 @@ def migrate_document(doc: dict, *, created: str | None = None, assets_dir=None,
                      doc_stem: str = "doc") -> dict:
     """Dispatch a legacy doc (URL or embedded) to NVDocumentData v8 (untagged)."""
     if is_embedded_document(doc):
-        # Implemented in 5d (embedded/full-export path).
-        try:
-            from importlib import import_module
+        # Embedded/full-export path lives in the companion module. It gets THIS
+        # module as `helpers` (the hyphenated script name is not importable), so
+        # both paths share one skeleton / scene / volume / mesh transform.
+        import migrate_nvd_embedded
 
-            embedded = import_module("migrate_nvd_embedded")
-        except ImportError:
-            raise NotImplementedError(
-                "embedded/full-export .nvd migration is not implemented yet (5d)"
-            )
-        return embedded.migrate_embedded_document(
-            doc, created=created, assets_dir=assets_dir, doc_stem=doc_stem
+        return migrate_nvd_embedded.migrate_embedded_document(
+            doc,
+            created=created,
+            assets_dir=assets_dir,
+            doc_stem=doc_stem,
+            helpers=sys.modules.get(__name__) or types.SimpleNamespace(**globals()),
         )
     return migrate_url_document(doc, created=created)
 
@@ -417,17 +484,19 @@ def _output_path(in_path, outdir, as_cbor):
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         return os.path.join(outdir, stem + ".nvd")
-    # Non-destructive default: alongside the input with a .migrated marker.
+    # Non-destructive default: alongside the input, tagged with the document
+    # version it was migrated TO (`foo.nvd` -> `foo.v9.nvd`), so the tag moves
+    # with DOCUMENT_VERSION and a later re-migration is distinguishable.
     d = os.path.dirname(in_path)
-    return os.path.join(d, stem + ".migrated.nvd")
+    return os.path.join(d, f"{stem}.v{DOCUMENT_VERSION}.nvd")
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Migrate legacy FreeBrowse .nvd -> niivue-mono v8")
     p.add_argument("inputs", nargs="+", help="file(s), dir(s) (recursed), or glob(s)")
-    p.add_argument("-o", "--outdir", help="write outputs here (default: alongside input, .migrated.nvd)")
+    p.add_argument("-o", "--outdir", help=f"write outputs here (default: alongside input as <stem>.v{DOCUMENT_VERSION}.nvd)")
     p.add_argument("--cbor", action="store_true", help="emit binary CBOR instead of JSON (needs cbor2)")
-    p.add_argument("--assets-dir", help="where to write exploded volume sidecars for embedded docs (5d)")
+    p.add_argument("--assets-dir", help="ignored (embedded volumes are migrated self-contained); kept for old invocations")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -460,12 +529,13 @@ def main(argv=None):
             else:
                 write_json(doc_v8, out_path)
             if args.verbose:
-                nv = len(doc_v8.get("volumes", []))
+                vols = doc_v8.get("volumes", [])
+                ne = sum(1 for v in vols if "data" in v)
                 nm = len(doc_v8.get("meshes", []))
-                print(f"{in_path} -> {out_path}  ({nv} volumes, {nm} meshes)")
-        except NotImplementedError as e:
-            _warn(f"{in_path}: {e}")
-            errors += 1
+                print(
+                    f"{in_path} -> {out_path}  "
+                    f"({len(vols)} volumes [{ne} embedded], {nm} meshes)"
+                )
         except Exception as e:  # noqa: BLE001 - report and continue the batch
             _warn(f"{in_path}: {e}")
             errors += 1

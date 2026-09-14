@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
 import type { NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
+import { applyLabelColormapsAfterLoad } from "@/hooks/use-volumes";
 
 const LEGACY_NVD_MESSAGE =
   "This .nvd predates the niivue document schema (it has `imageOptionsArray` " +
@@ -32,11 +33,20 @@ function assertNotLegacyDocument(
     const prefix = new TextDecoder("utf-8", { fatal: false }).decode(
       data.subarray(0, 64 * 1024),
     );
-    if (prefix.includes('"imageOptionsArray"') && !prefix.includes('"version"'))
+    // `encodedImageBlobs` is checked too: FreeBrowse 2.4.x writes it FIRST, so
+    // in a 45 MB embedded document `imageOptionsArray` sits far past the prefix.
+    // v9 documents never carry that key.
+    const legacyKey =
+      prefix.includes('"imageOptionsArray"') ||
+      prefix.includes('"encodedImageBlobs"');
+    if (legacyKey && !prefix.includes('"version"'))
       throw new Error(LEGACY_NVD_MESSAGE);
     return;
   }
-  if ("imageOptionsArray" in data && typeof data.version !== "number") {
+  if (
+    ("imageOptionsArray" in data || "encodedImageBlobs" in data) &&
+    typeof data.version !== "number"
+  ) {
     throw new Error(LEGACY_NVD_MESSAGE);
   }
 }
@@ -100,6 +110,8 @@ export function useFileLoading(
       }
 
       await nv.loadDocument(file);
+      // Migrated legacy documents name label palettes by `colormap` only.
+      await applyLabelColormapsAfterLoad(nv);
 
       // Select a first volume / surface so the details tabs have a target. The
       // lists themselves follow via events.

@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { NiiVue } from "@/__mocks__/niivue.v2";
 import { useFreeBrowseStore } from "@/store";
-import { useVolumes } from "./use-volumes";
+import { applyLabelColormapsAfterLoad, useVolumes } from "./use-volumes";
 
 type VolRef = Parameters<typeof useVolumes>[0];
 const refOf = (nv: NiiVue) => ({ current: nv }) as unknown as VolRef;
+const asNv = (nv: NiiVue) =>
+  nv as unknown as Parameters<typeof applyLabelColormapsAfterLoad>[0];
 const noop = () => {};
 
 const colormapEvent = (value: string) =>
@@ -59,6 +61,27 @@ describe("useVolumes — colormap dropdown routing", () => {
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
     act(() => result.current.handleColormapChange(colormapEvent("freesurfer")));
     expect(setVol).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyLabelColormapsAfterLoad — label palettes named by colormap only", () => {
+  test("attaches the label LUT to categorical volumes lacking colormapLabel", async () => {
+    const nv = new NiiVue();
+    nv.volumes.push({ id: "v0", colormap: "Gray" });
+    nv.volumes.push({ id: "v1", colormap: "Freesurfer" });
+    nv.volumes.push({ id: "v2", colormap: "roi_i256", colormapLabel: { lut: [] } });
+    nv.volumes.push({ id: "v3" });
+    const setLabel = vi.spyOn(nv, "setColormapLabel");
+    await applyLabelColormapsAfterLoad(asNv(nv));
+    expect(setLabel).toHaveBeenCalledTimes(1);
+    expect(setLabel).toHaveBeenCalledWith(1, "Freesurfer");
+  });
+
+  test("no volumes -> no calls", async () => {
+    const nv = new NiiVue();
+    const setLabel = vi.spyOn(nv, "setColormapLabel");
+    await applyLabelColormapsAfterLoad(asNv(nv));
+    expect(setLabel).not.toHaveBeenCalled();
   });
 });
 

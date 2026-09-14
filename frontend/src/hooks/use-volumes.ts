@@ -11,7 +11,28 @@ import type { NiiVue } from "@niivue/niivue";
  * we've made opaque (alpha 255) are included — random/nih still ship alpha 64
  * and would wash out, so they're excluded pending the Phase-7 systemic fix.
  */
-const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256"]);
+export const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256"]);
+
+/**
+ * After a document loads, attach the label LUT to every volume whose
+ * `colormap` names a categorical palette but that carries no `colormapLabel`.
+ *
+ * niivue-mono applies a document's `colormap` as a continuous gradient
+ * (niivue/mono#69), so a migrated legacy scene -- `aseg` with `Freesurfer`,
+ * say -- would render as a smooth ramp. A document the app itself saved after
+ * a dropdown change already embeds `colormapLabel` and is left alone. Same
+ * dual call as `handleColormapChange`.
+ */
+export async function applyLabelColormapsAfterLoad(nv: NiiVue): Promise<void> {
+  const volumes = nv.volumes || [];
+  for (let i = 0; i < volumes.length; i++) {
+    const v = volumes[i] as { colormap?: unknown; colormapLabel?: unknown };
+    const name = typeof v.colormap === "string" ? v.colormap : "";
+    if (!name || v.colormapLabel) continue;
+    if (!LABEL_COLORMAPS.has(name.toLowerCase())) continue;
+    await nv.setColormapLabel(i, name);
+  }
+}
 
 export function useVolumes(
   nvRef: React.RefObject<NiiVue | null>,
