@@ -280,12 +280,11 @@ def transform_volume(old: dict) -> dict:
         vol["colormap"] = _canonical_colormap(old["colormap"])
     if old.get("colormapNegative"):
         vol["colormapNegative"] = _canonical_colormap(old["colormapNegative"])
-    # niivue-mono volumes have no `visible` flag; hide via opacity 0 (mirrors the
-    # mesh visibility-via-opacity convention).
-    opacity = _num(old.get("opacity", 1.0))
-    if old.get("visible") is False:
-        opacity = 0.0
-    vol["opacity"] = opacity
+    # A legacy `visible` key is ignored on purpose: old niivue never had it on
+    # volume options and old FreeBrowse only read it on meshes, so it was a
+    # no-op there. Mapping it to opacity 0 hid both volumes of the
+    # `mgz-surf-eg` demo (the one corpus file that carries it).
+    vol["opacity"] = _num(old.get("opacity", 1.0))
     if "cal_min" in old:
         vol["calMin"] = _num(old["cal_min"])
     if "cal_max" in old:
