@@ -16,6 +16,7 @@ import {
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
 import type { NiiVue } from "@niivue/niivue";
+import { getFreeBrowseConfig } from "@/lib/deployment-config";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
 import Sidebar from "./sidebar";
@@ -34,13 +35,14 @@ export interface FreeBrowseProps {
   nv: NiiVue;
   /**
    * Publish the instance as `window.freebrowse.nv` for external callers
-   * (console, embedding pages). Default true; a library host that already
-   * holds the instance can turn it off.
+   * (console, embedding pages). Defaults to the configured `exposeGlobal`
+   * (app: true; library: false).
    */
   exposeGlobal?: boolean;
 }
 
-export default function FreeBrowse({ nv, exposeGlobal = true }: FreeBrowseProps) {
+export default function FreeBrowse({ nv, exposeGlobal }: FreeBrowseProps) {
+  const expose = exposeGlobal ?? getFreeBrowseConfig().exposeGlobal;
   const nvRef = useRef<NiiVue | null>(nv);
   nvRef.current = nv;
 
@@ -50,12 +52,12 @@ export default function FreeBrowse({ nv, exposeGlobal = true }: FreeBrowseProps)
   // instance (window.freebrowse.nv) update the UI through the same path.
   useEffect(() => {
     const teardown = registerNiiVueEvents(nv, createStoreSyncTarget(nv));
-    if (exposeGlobal) window.freebrowse = { nv }; // typed in src/window.d.ts
+    if (expose) window.freebrowse = { nv }; // typed in src/window.d.ts
     return () => {
       teardown();
       if (window.freebrowse?.nv === nv) delete window.freebrowse;
     };
-  }, [nv, exposeGlobal]);
+  }, [nv, expose]);
 
   // --- Hooks ---
   const {

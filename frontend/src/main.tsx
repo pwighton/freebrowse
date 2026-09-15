@@ -21,8 +21,9 @@ if (deploymentConfig.downloadDisabled) {
 // This is automatically set by Vite based on the `base` config option
 const basename = import.meta.env.BASE_URL;
 
-// Use HashRouter for serverless mode (file:// protocol compatibility)
-const isServerless = import.meta.env.VITE_SERVERLESS === 'true';
+// Use HashRouter for serverless mode (file:// protocol compatibility).
+// `deploymentConfig` derives this from VITE_SERVERLESS (lib/deployment-config.ts).
+const isServerless = deploymentConfig.serverless;
 const Router = isServerless ? HashRouter : BrowserRouter;
 
 // The app owns its NiiVue instances (a library host would pass its own).

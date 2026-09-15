@@ -3,6 +3,7 @@ import { useFreeBrowseStore } from "@/store";
 import { gzipUint8Array, uint8ArrayToBase64 } from "@/lib/niivue-helpers";
 import { retargetVolumeUrls } from "@/lib/nvd-volume-urls";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
+import { dataUrl } from "@/lib/deployment-config";
 import type { NvdFormat } from "@/store/types";
 import type { NiiVue } from "@niivue/niivue";
 
@@ -154,7 +155,7 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
             );
           }
 
-          const response = await fetch("/data/nvd", {
+          const response = await fetch(dataUrl("nvd"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -198,7 +199,7 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
               const uint8Array = await gzipUint8Array(raw);
               const base64Data = uint8ArrayToBase64(uint8Array);
 
-              const volumeResponse = await fetch("/data/nii", {
+              const volumeResponse = await fetch(dataUrl("nii"), {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",

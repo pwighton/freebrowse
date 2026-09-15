@@ -3,6 +3,7 @@ import { useFreeBrowseStore } from "@/store";
 import type { NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 import { applyLabelColormapsAfterLoad } from "@/hooks/use-volumes";
+import { deploymentConfig, getFreeBrowseConfig } from "@/lib/deployment-config";
 
 const LEGACY_NVD_MESSAGE =
   "This .nvd predates the niivue document schema (it has `imageOptionsArray` " +
@@ -73,7 +74,7 @@ export function useFileLoading(
   );
   const setActiveTab = useFreeBrowseStore((s) => s.setActiveTab);
 
-  const serverlessMode = import.meta.env.VITE_SERVERLESS === "true";
+  const serverlessMode = deploymentConfig.serverless;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const surfaceFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -402,8 +403,10 @@ export function useFileLoading(
     }
   }, [serverlessMode, setActiveTab]);
 
-  // Load NVD from URL parameter on initial load
+  // Load NVD from URL parameter on initial load (app only: an embedding host
+  // keeps its own query string, see config.readUrlParams).
   useEffect(() => {
+    if (!getFreeBrowseConfig().readUrlParams) return;
     const urlParams = new URLSearchParams(window.location.search);
     const nvdParam = urlParams.get("nvd");
 
@@ -417,8 +420,9 @@ export function useFileLoading(
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load volume from URL parameter on initial load
+  // Load volume from URL parameter on initial load (app only, as above).
   useEffect(() => {
+    if (!getFreeBrowseConfig().readUrlParams) return;
     const urlParams = new URLSearchParams(window.location.search);
     const volParam = urlParams.get("vol");
 

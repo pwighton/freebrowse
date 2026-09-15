@@ -7,11 +7,12 @@ import {
 } from "@/lib/confirmations";
 import { gzipUint8Array, uint8ArrayToBase64 } from "@/lib/niivue-helpers";
 import type { AiSessionSummary } from "@/store/ai-slice";
+import { aiUrl, dataUrl, relativeToDataRoot } from "@/lib/deployment-config";
 
 const SESSION_NAME_RE = /^[A-Za-z0-9_-]+$/;
 
 async function fetchSessionList(): Promise<AiSessionSummary[]> {
-  const res = await fetch("/ai/session/list");
+  const res = await fetch(aiUrl("session/list"));
   if (!res.ok) throw new Error(`GET /ai/session/list failed: ${res.status}`);
   return res.json();
 }
@@ -23,9 +24,7 @@ function ensureNiiName(name: string | undefined | null): string {
 }
 
 function stripDataPrefix(url: string): string | null {
-  if (url.startsWith("/data/")) return url.slice("/data/".length);
-  if (url.startsWith("data/")) return url.slice("data/".length);
-  return null;
+  return relativeToDataRoot(url);
 }
 
 async function fetchArrayBuffer(url: string): Promise<Uint8Array> {
@@ -51,7 +50,7 @@ async function exportAndUploadDrawing(
   const bytes = await gzipUint8Array(raw);
   const annotRel = "annotations.nii.gz";
   const targetPath = `ai-sessions/${sessionName}/${annotRel}`;
-  const res = await fetch("/data/nii", {
+  const res = await fetch(dataUrl("nii"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -71,7 +70,7 @@ async function postSetAnnots(
   annotationRelPath: string,
 ): Promise<void> {
   const res = await fetch(
-    `/ai/session/${encodeURIComponent(sessionId)}/set_annots`,
+    aiUrl(`session/${encodeURIComponent(sessionId)}/set_annots`),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -196,7 +195,7 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
         if (!ok) throw new Error("Upload cancelled");
       }
 
-      const newRes = await fetch("/ai/session/new", {
+      const newRes = await fetch(aiUrl("session/new"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_name: trimmed }),
@@ -220,7 +219,7 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
             : new Uint8Array();
         const base64Data = uint8ArrayToBase64(uint8Array);
 
-        const uploadRes = await fetch("/data/nii", {
+        const uploadRes = await fetch(dataUrl("nii"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: targetPath, data: base64Data }),
@@ -236,7 +235,7 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
       }
 
       const setVolRes = await fetch(
-        `/ai/session/${encodeURIComponent(session_id)}/set_volume`,
+        aiUrl(`session/${encodeURIComponent(session_id)}/set_volume`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -269,8 +268,8 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
 
       const volumeUrl =
         summary.volume_path_root === "session"
-          ? `/data/ai-sessions/${summary.session_name}/${summary.volume_path}`
-          : `/data/${summary.volume_path}`;
+          ? dataUrl(`ai-sessions/${summary.session_name}/${summary.volume_path}`)
+          : dataUrl(summary.volume_path);
 
       // Ensure the niivue canvas is mounted + attached (first-load-in-session path).
       // Same trick use-file-loading.ts:196 uses before addVolumeFromUrl.
@@ -282,7 +281,9 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
 
       if (summary.annotation_path) {
         try {
-          const annotUrl = `/data/ai-sessions/${summary.session_name}/${summary.annotation_path}`;
+          const annotUrl = dataUrl(
+            `ai-sessions/${summary.session_name}/${summary.annotation_path}`,
+          );
           const bytes = await fetchArrayBuffer(annotUrl);
           // Load the annotation mask as the drawing layer. loadDrawing takes a
           // File|string and gunzips by the .gz name; it hard-requires uint8
@@ -326,7 +327,9 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
       await postSetAnnots(active.session_id, annotRel);
 
       const inferRes = await fetch(
-        `/ai/session/${encodeURIComponent(active.session_id)}/infer/${encodeURIComponent(mlId)}`,
+        aiUrl(
+          `session/${encodeURIComponent(active.session_id)}/infer/${encodeURIComponent(mlId)}`,
+        ),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -354,7 +357,7 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
       }
 
       const resultUrl =
-        `/data/ai-sessions/${active.session_name}/${RESULT_FILENAME}` +
+        dataUrl(`ai-sessions/${active.session_name}/${RESULT_FILENAME}`) +
         `?t=${Date.now()}`;
       nv.addColormap(AI_RESULT_COLORMAP_NAME, AI_RESULT_COLORMAP);
       await nv.addVolume({
@@ -389,7 +392,7 @@ export function useAiSession(nvRef: React.RefObject<NiiVue | null>) {
 
     const id = aiActiveSession.session_id;
     try {
-      const res = await fetch(`/ai/session/${encodeURIComponent(id)}`, {
+      const res = await fetch(aiUrl(`session/${encodeURIComponent(id)}`), {
         method: "DELETE",
       });
       if (!res.ok) {
