@@ -15,7 +15,7 @@ import {
   resolveImagingUploadConfirmation,
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
-import { NiiVue } from "@niivue/niivue";
+import type { NiiVue } from "@niivue/niivue";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
 import Sidebar from "./sidebar";
@@ -25,17 +25,24 @@ import SettingsDialog from "./dialogs/settings-dialog";
 import ImagingUploadConfirmationDialog from "./dialogs/imaging-upload-confirmation-dialog";
 import SessionDeleteConfirmationDialog from "./dialogs/session-delete-confirmation-dialog";
 
-const nv = new NiiVue({
-  // No `backend` option: niivue picks WebGPU when `navigator.gpu` exists and
-  // falls back to WebGL2 otherwise (logging "WebGPU not available").
-  placeholderText: "Drag-drop images",
-  isDragDropEnabled: true,
-  backgroundColor: [0, 0, 0, 1],
-  crosshairColor: [1.0, 0.0, 0.0, 0.5],
-});
+export interface FreeBrowseProps {
+  /**
+   * The NiiVue instance this UI reflects and drives. The app creates it with
+   * `createFreeBrowseInstance()` (`lib/default-niivue-options.ts`); an
+   * embedding host may pass its own.
+   */
+  nv: NiiVue;
+  /**
+   * Publish the instance as `window.freebrowse.nv` for external callers
+   * (console, embedding pages). Default true; a library host that already
+   * holds the instance can turn it off.
+   */
+  exposeGlobal?: boolean;
+}
 
-export default function FreeBrowse() {
+export default function FreeBrowse({ nv, exposeGlobal = true }: FreeBrowseProps) {
   const nvRef = useRef<NiiVue | null>(nv);
+  nvRef.current = nv;
 
   // Event-driven sync: the Zustand store is a derived view of niivue state.
   // registerNiiVueEvents subscribes the store adapter to niivue's events, so
@@ -43,9 +50,12 @@ export default function FreeBrowse() {
   // instance (window.freebrowse.nv) update the UI through the same path.
   useEffect(() => {
     const teardown = registerNiiVueEvents(nv, createStoreSyncTarget(nv));
-    window.freebrowse = { nv }; // typed in src/window.d.ts
-    return teardown;
-  }, []);
+    if (exposeGlobal) window.freebrowse = { nv }; // typed in src/window.d.ts
+    return () => {
+      teardown();
+      if (window.freebrowse?.nv === nv) delete window.freebrowse;
+    };
+  }, [nv, exposeGlobal]);
 
   // --- Hooks ---
   const {

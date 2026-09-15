@@ -3,8 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@niivue/niivue", () => import("@/__mocks__/niivue"));
 
+import { NiiVue } from "@niivue/niivue";
 import { useFreeBrowseStore } from "@/store";
 import FreeBrowse from "./freebrowse";
+import { createFreeBrowseInstance } from "@/lib/default-niivue-options";
+
+type Nv = InstanceType<typeof NiiVue>;
 
 /**
  * Mount smoke + the event-driven contract: the Zustand store is a derived view
@@ -26,24 +30,39 @@ describe("FreeBrowse", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    delete window.freebrowse;
   });
 
-  it("mounts empty (drop zone, no volumes) and exposes the instance on window.freebrowse", async () => {
+  it("mounts empty (drop zone, no volumes) and exposes the given instance on window.freebrowse", async () => {
+    const nv = createFreeBrowseInstance();
     await act(async () => {
-      render(<FreeBrowse />);
+      render(<FreeBrowse nv={nv} />);
     });
     // Before any volume is loaded the shell shows the uploader, not the canvas.
     expect(screen.getByText("Load Medical Images")).toBeInTheDocument();
     expect(screen.getByText("No images")).toBeInTheDocument();
-    expect(window.freebrowse?.nv).toBeDefined();
-    expect(window.freebrowse?.nv.volumes).toHaveLength(0);
+    expect(window.freebrowse?.nv).toBe(nv);
+    expect(nv.volumes).toHaveLength(0);
+  });
+
+  it("exposeGlobal={false} leaves window.freebrowse unset; unmount clears it when set", async () => {
+    const nv = createFreeBrowseInstance();
+    const view = await act(async () => render(<FreeBrowse nv={nv} exposeGlobal={false} />));
+    expect(window.freebrowse).toBeUndefined();
+    view.unmount();
+
+    const nv2 = createFreeBrowseInstance();
+    const view2 = await act(async () => render(<FreeBrowse nv={nv2} />));
+    expect(window.freebrowse?.nv).toBe(nv2);
+    view2.unmount();
+    expect(window.freebrowse).toBeUndefined();
   });
 
   it("a volume added through the niivue API shows up in the sidebar", async () => {
+    const nv: Nv = createFreeBrowseInstance();
     await act(async () => {
-      render(<FreeBrowse />);
+      render(<FreeBrowse nv={nv} />);
     });
-    const nv = window.freebrowse!.nv;
     await act(async () => {
       await nv.addVolume({ url: "https://x/brain.nii.gz", name: "brain.nii.gz" });
     });
@@ -52,10 +71,10 @@ describe("FreeBrowse", () => {
   });
 
   it("a slice-type change on the instance is mirrored into the store's view mode", async () => {
+    const nv: Nv = createFreeBrowseInstance();
     await act(async () => {
-      render(<FreeBrowse />);
+      render(<FreeBrowse nv={nv} />);
     });
-    const nv = window.freebrowse!.nv;
     await act(async () => {
       nv.sliceType = 4; // SLICE_TYPE.RENDER
       nv.showRender = 1; // SHOW_RENDER.ALWAYS

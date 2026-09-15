@@ -7,6 +7,10 @@ import FreeBrowse from './components/freebrowse.tsx';
 import QaViewer from './components/qa-viewer.tsx';
 import { deploymentConfig } from './lib/deployment-config';
 import { applyExportLockdown } from './lib/disable-export';
+import {
+  createFreeBrowseInstance,
+  QA_VIEWER_NIIVUE_OPTIONS,
+} from './lib/default-niivue-options';
 
 // Secure deployments: neutralize niivue's save-to-disk API before the app mounts.
 if (deploymentConfig.downloadDisabled) {
@@ -21,6 +25,10 @@ const basename = import.meta.env.BASE_URL;
 const isServerless = import.meta.env.VITE_SERVERLESS === 'true';
 const Router = isServerless ? HashRouter : BrowserRouter;
 
+// The app owns its NiiVue instances (a library host would pass its own).
+const nv = createFreeBrowseInstance();
+const qaNv = isServerless ? null : createFreeBrowseInstance(QA_VIEWER_NIIVUE_OPTIONS);
+
 createRoot(document.getElementById('root')!).render(
   // disable strict mode for for better niivue development experience
   // <StrictMode>
@@ -29,15 +37,15 @@ createRoot(document.getElementById('root')!).render(
       <Route path="/" element={
          <div className="app-container">
            <div className="main-content">
-             <FreeBrowse />
+             <FreeBrowse nv={nv} />
            </div>
          </div>
       } />
-      {!isServerless && (
+      {qaNv && (
         <Route path="/qa" element={
           <div className="app-container">
             <div className="main-content">
-              <QaViewer />
+              <QaViewer nv={qaNv} />
             </div>
           </div>
         } />

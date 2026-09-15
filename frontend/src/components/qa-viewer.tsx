@@ -4,33 +4,28 @@ import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useVolumes } from "@/hooks/use-volumes";
 import { useFileLoading } from "@/hooks/use-file-loading";
-import { NiiVue } from "@niivue/niivue";
+import type { NiiVue } from "@niivue/niivue";
 import { PanelRight } from "lucide-react";
 import "../App.css";
 import ViewerShell from "./viewer-shell";
 import QaSidebar from "./qa-sidebar";
 import SettingsDialog from "./dialogs/settings-dialog";
 
-const nv = new NiiVue({
-  // No `backend` option: niivue picks WebGPU when `navigator.gpu` exists and
-  // falls back to WebGL2 otherwise (logging "WebGPU not available").
-  placeholderText: "",
-  isDragDropEnabled: false,
-  backgroundColor: [0, 0, 0, 1],
-  crosshairColor: [1.0, 0.88, 0.88, 1.0],
-  crosshairWidth: 0.3,
-  crosshairGap: 10,
-});
-
 const noopSurface = () => {};
 
-export default function QaViewer() {
+export interface QaViewerProps {
+  /** Instance for the QA route; the app builds it with `QA_VIEWER_NIIVUE_OPTIONS`. */
+  nv: NiiVue;
+}
+
+export default function QaViewer({ nv }: QaViewerProps) {
   const nvRef = useRef<NiiVue | null>(nv);
+  nvRef.current = nv;
 
   // Event-driven store sync for this viewer's instance (see FreeBrowse).
   useEffect(() => {
     return registerNiiVueEvents(nv, createStoreSyncTarget(nv));
-  }, []);
+  }, [nv]);
 
   const {
     viewerOptions,
