@@ -17,7 +17,6 @@ import {
 } from "@/lib/confirmations";
 import type { NiiVue } from "@niivue/niivue";
 import { getFreeBrowseConfig } from "@/lib/deployment-config";
-import "../App.css";
 import ViewerShell from "./viewer-shell";
 import Sidebar from "./sidebar";
 import RemoveDialog from "./dialogs/remove-dialog";

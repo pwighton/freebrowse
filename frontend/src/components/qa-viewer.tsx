@@ -6,7 +6,6 @@ import { useVolumes } from "@/hooks/use-volumes";
 import { useFileLoading } from "@/hooks/use-file-loading";
 import type { NiiVue } from "@niivue/niivue";
 import { PanelRight } from "lucide-react";
-import "../App.css";
 import ViewerShell from "./viewer-shell";
 import QaSidebar from "./qa-sidebar";
 import SettingsDialog from "./dialogs/settings-dialog";

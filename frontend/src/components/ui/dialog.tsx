@@ -18,24 +18,25 @@ const Dialog = ({ open = false, onOpenChange, children }: DialogProps) => {
       }
     }
 
+    // Escape closes while open. No body-scroll lock: the overlay is confined to
+    // the viewer (absolute within `.freebrowse-root`), so the host page's
+    // scrolling is none of our business.
     if (open) {
       document.addEventListener("keydown", handleEscape)
-      document.body.style.overflow = "hidden"
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape)
-      document.body.style.overflow = "unset"
     }
   }, [open, onOpenChange])
 
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50" 
+      <div
+        className="absolute inset-0 bg-black/50"
         onClick={() => onOpenChange?.(false)}
       />
       {/* Dialog content */}

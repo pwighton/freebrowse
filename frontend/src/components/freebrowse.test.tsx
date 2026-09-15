@@ -70,6 +70,40 @@ describe("FreeBrowse", () => {
     expect(screen.queryByText("No images")).not.toBeInTheDocument();
   });
 
+  it("dark mode is a class on the .freebrowse-root element, never on <html>", async () => {
+    const nv = createFreeBrowseInstance();
+    await act(async () => {
+      render(<FreeBrowse nv={nv} />);
+    });
+    const root = document.querySelector(".freebrowse-root");
+    expect(root).not.toBeNull();
+    await act(async () => {
+      useFreeBrowseStore.setState({ darkMode: true });
+    });
+    expect(root!.classList.contains("dark")).toBe(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    await act(async () => {
+      useFreeBrowseStore.setState({ darkMode: false });
+    });
+    expect(root!.classList.contains("dark")).toBe(false);
+  });
+
+  it("opening a dialog does not touch the host page's body styles", async () => {
+    const nv = createFreeBrowseInstance();
+    await act(async () => {
+      render(<FreeBrowse nv={nv} />);
+    });
+    await act(async () => {
+      useFreeBrowseStore.setState({ settingsDialogOpen: true });
+    });
+    expect(document.body.style.overflow).toBe("");
+    const overlay = document.querySelector(".freebrowse-root .absolute.inset-0");
+    expect(overlay).not.toBeNull();
+    await act(async () => {
+      useFreeBrowseStore.setState({ settingsDialogOpen: false });
+    });
+  });
+
   it("a slice-type change on the instance is mirrored into the store's view mode", async () => {
     const nv: Nv = createFreeBrowseInstance();
     await act(async () => {
