@@ -129,7 +129,7 @@ The handle returned has `nv` and `destroy()`. **One mount at a time**: FreeBrows
 single store, so a second concurrent mount throws; destroy the first one. Styles are scoped to
 the mounted element (`.freebrowse-root`) and never touch your page's `html`/`body`; import
 `freebrowse/style.css` once. Working examples for both entries live in
-[`frontend/examples/`](frontend/examples/).
+[`frontend/examples/`](frontend/examples/); they install `freebrowse@next` from npm.
 
 Releasing (maintainers): bump `version` in `frontend/package.json` (the app and the package
 share it; pre-merge builds use a `-next.N` suffix), then from `frontend/`:

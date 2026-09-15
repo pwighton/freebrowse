@@ -7,6 +7,7 @@ Two host applications that embed FreeBrowse from the built npm package:
   styles, canvas and footer.
 - [`react/`](react/) — React 19 + Vite, the `freebrowse/react` component.
 
-Both install `freebrowse` from `examples/freebrowse.tgz`, produced by
-`npm run examples:pack` in `frontend/`, so they exercise the real package exactly as a
-consumer would (`exports` map, types, bundled React, scoped CSS) — not a workspace link.
+Both install `freebrowse@next` from npm, exactly as a consumer would. To try an
+unpublished build, `npm run examples:pack` in `frontend/` produces `examples/freebrowse.tgz`
+and `npm install ../freebrowse.tgz` inside an example points it at that tarball (see the
+vanilla README).

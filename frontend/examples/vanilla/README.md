@@ -5,17 +5,22 @@ The host page owns a NiiVue instance, mounts FreeBrowse around it with
 FreeBrowse UI follows. The page also has its own styles, canvas and footer so
 that any style leaking out of FreeBrowse would be visible.
 
-The example installs the **packed tarball**, not a workspace link, so it exercises
-the real package (`exports`, types, bundled React, scoped CSS):
+The example installs `freebrowse@next` from npm — exactly what a collaborator
+gets — plus `@niivue/niivue` as the peer dependency:
 
 ```bash
-cd frontend
-npm run examples:pack        # build:package + npm pack -> examples/freebrowse.tgz
-cd examples/vanilla
+cd frontend/examples/vanilla
 npm install
 npm run dev                  # http://localhost:5173/
 ```
 
 Append `?nomount` to the URL to see the host page without FreeBrowse (used by the
-CSS-bleed check). Re-run `npm run examples:pack` and `npm install` after changing
-the package.
+CSS-bleed check).
+
+To test an **unpublished** build of the package instead, pack it and point the
+example at the tarball (don't commit the resulting `package.json` change):
+
+```bash
+cd frontend && npm run examples:pack        # -> examples/freebrowse.tgz
+cd examples/vanilla && npm install ../freebrowse.tgz && npm run dev
+```
