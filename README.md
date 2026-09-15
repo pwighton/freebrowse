@@ -121,6 +121,9 @@ configureFreeBrowse({ backend: null });   // once, before the first render
 | `readUrlParams` | `false` | Honour `?nvd=` / `?vol=` on the host page URL. |
 | `exposeGlobal` | `false` | Also publish the instance as `window.freebrowse.nv`. |
 | `downloadDisabled` | `false` | Disable the Download button and niivue's save-to-disk methods. |
+| `dragDrop` | `true` | `false` turns off drag-and-drop loading (niivue's canvas drop and the drop zone) and shows the canvas from the start — for hosts that load data themselves. |
+| `sidebar` | `true` | Show the sidebar initially; the header button still toggles it. |
+| `footer` | `true` | Show the footer (coordinate readout) initially. |
 
 The handle returned has `nv` and `destroy()`. **One mount at a time**: FreeBrowse's UI state is a
 single store, so a second concurrent mount throws; destroy the first one. Styles are scoped to

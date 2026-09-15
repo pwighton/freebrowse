@@ -29,6 +29,16 @@ export interface MountOptions {
   exposeGlobal?: boolean;
   /** Disable the Download button and niivue's save-to-disk methods. Default false. */
   downloadDisabled?: boolean;
+  /**
+   * Allow loading by drag-and-drop (niivue's canvas drop and FreeBrowse's
+   * drop zone). `false` also skips the drop zone and shows the canvas from
+   * the start, for hosts that load data themselves. Default true.
+   */
+  dragDrop?: boolean;
+  /** Show the sidebar initially (the header button still toggles it). Default true. */
+  sidebar?: boolean;
+  /** Show the footer (coordinate readout) initially. Default true. */
+  footer?: boolean;
 }
 
 export interface FreeBrowseHandle {
@@ -69,11 +79,27 @@ export function mountFreeBrowse(
   });
   // The store hydrated once at import with the default key; re-read through
   // the (now configured) storage so `persist` takes effect before first paint.
-  void useFreeBrowseStore.persist.rehydrate();
+  // Layout options are re-applied afterwards so a persisted preference from an
+  // earlier session cannot override what the host asked for at mount.
+  const layout = { sidebar: options.sidebar, footer: options.footer };
+  void useFreeBrowseStore.persist.rehydrate()?.then(() => {
+    const patch: Partial<{ sidebarOpen: boolean; footerOpen: boolean }> = {};
+    if (layout.sidebar !== undefined) patch.sidebarOpen = layout.sidebar;
+    if (layout.footer !== undefined) patch.footerOpen = layout.footer;
+    if (Object.keys(patch).length) useFreeBrowseStore.setState(patch);
+  });
 
   const root = createRoot(container);
   activeRoot = root;
-  root.render(<FreeBrowse nv={nv} hostInstance={hostInstance} />);
+  root.render(
+    <FreeBrowse
+      nv={nv}
+      hostInstance={hostInstance}
+      dragDrop={options.dragDrop}
+      sidebar={options.sidebar}
+      footer={options.footer}
+    />,
+  );
 
   return {
     nv,

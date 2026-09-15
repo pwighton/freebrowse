@@ -35,6 +35,11 @@ let fb = null;
 function mount() {
   fb = mountFreeBrowse(viewer, {
     nv,
+    // A host that loads data itself: no drag-and-drop / drop zone, and a
+    // minimal chrome (the header buttons can still open the sidebar).
+    dragDrop: false,
+    sidebar: false,
+    footer: false,
     // Demo conveniences; both default to false in a real embed:
     exposeGlobal: true, // window.freebrowse.nv for console experiments
     persist: false, // don't write this demo's preferences to localStorage

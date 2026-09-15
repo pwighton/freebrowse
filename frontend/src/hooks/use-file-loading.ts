@@ -387,14 +387,18 @@ export function useFileLoading(
     };
   }, [nvRef, incrementVolumeVersion]);
 
-  // Enable/disable drag-and-drop based on whether volumes are loaded
+  // niivue's own canvas drag-and-drop: only while the drop zone is up and
+  // nothing is loaded, and never when the host switched drag-and-drop off.
+  const dragDropEnabled = useFreeBrowseStore((s) => s.dragDropEnabled);
   useEffect(() => {
     void volumeVersion;
     if (nvRef.current) {
       nvRef.current.isDragDropEnabled =
-        showUploader && (nvRef.current.volumes?.length ?? 0) === 0;
+        dragDropEnabled &&
+        showUploader &&
+        (nvRef.current.volumes?.length ?? 0) === 0;
     }
-  }, [nvRef, volumeVersion, showUploader]);
+  }, [nvRef, volumeVersion, showUploader, dragDropEnabled]);
 
   // If in serverless mode, switch to sceneDetails tab by default
   useEffect(() => {

@@ -34,8 +34,9 @@ export default function App() {
         </button>
       </nav>
       <div id="viewer">
-        {/* hostInstance: seed FreeBrowse's UI from `nv`, never push defaults onto it */}
-        <FreeBrowse nv={nv} hostInstance />
+        {/* hostInstance: seed FreeBrowse's UI from `nv`, never push defaults onto it.
+            dragDrop/sidebar/footer off: the host loads data and keeps the chrome minimal. */}
+        <FreeBrowse nv={nv} hostInstance dragDrop={false} sidebar={false} footer={false} />
       </div>
     </>
   );

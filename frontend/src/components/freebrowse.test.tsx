@@ -34,6 +34,9 @@ describe("FreeBrowse", () => {
     useFreeBrowseStore.setState({
       viewerOptions: { ...useFreeBrowseStore.getInitialState().viewerOptions },
       showUploader: true,
+      dragDropEnabled: true,
+      sidebarOpen: true,
+      footerOpen: true,
     });
   });
 
