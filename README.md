@@ -73,6 +73,69 @@ python3 scripts/migrate-nvd.py scene.nvd --cbor     # binary output (needs cbor2
 `scripts/nvd-embed.py` embeds a document into a single-file build (see
 [Build](#build)), and `python3 -m pytest` runs the script's tests.
 
+## Embedding FreeBrowse in your own app (npm package)
+
+FreeBrowse is published to npm as `freebrowse`. Until the niivue-mono migration lands on
+`main` it is available under the `next` dist-tag only:
+
+```bash
+npm install freebrowse@next @niivue/niivue@1.0.0-rc.13
+```
+
+`@niivue/niivue` is a peer dependency: **you** create the NiiVue instance, FreeBrowse renders
+its UI for it, and anything you do to the instance through niivue's API shows up in that UI
+(see [Driving FreeBrowse from your own code](#driving-freebrowse-from-your-own-code)). A
+classic-niivue (0.x) instance cannot be used — the package targets niivue 1.0.
+
+**Vanilla JavaScript** (React is bundled; nothing else to install):
+
+```js
+import { NiiVue } from "@niivue/niivue";
+import { mountFreeBrowse } from "freebrowse";
+import "freebrowse/style.css";
+
+const nv = new NiiVue({ backgroundColor: [0, 0, 0, 1] });
+const fb = mountFreeBrowse(document.getElementById("viewer"), { nv });
+await nv.addVolume({ url: "https://niivue.com/demos/images/mni152.nii.gz" });
+// ... later
+fb.destroy();
+```
+
+**React 19 hosts** (`react` / `react-dom` are peers on this entry, not bundled):
+
+```jsx
+import { FreeBrowse, configureFreeBrowse } from "freebrowse/react";
+import "freebrowse/style.css";
+
+configureFreeBrowse({ backend: null });   // once, before the first render
+<FreeBrowse nv={nv} hostInstance />
+```
+
+`mountFreeBrowse(container, options)` options, all optional:
+
+| option | default | meaning |
+| --- | --- | --- |
+| `nv` | created for you | Your NiiVue instance. When given, FreeBrowse seeds its UI from the instance's settings and never pushes its own defaults onto it. |
+| `backend` | `null` | `{ dataUrl, aiUrl }` of a FreeBrowse backend. `null` hides Save-to-server, the Data/NVD tabs and AI. |
+| `persist` | `"freebrowse-user-settings"` | localStorage key for user preferences, or `false` to keep them in memory. |
+| `readUrlParams` | `false` | Honour `?nvd=` / `?vol=` on the host page URL. |
+| `exposeGlobal` | `false` | Also publish the instance as `window.freebrowse.nv`. |
+| `downloadDisabled` | `false` | Disable the Download button and niivue's save-to-disk methods. |
+
+The handle returned has `nv` and `destroy()`. **One mount at a time**: FreeBrowse's UI state is a
+single store, so a second concurrent mount throws; destroy the first one. Styles are scoped to
+the mounted element (`.freebrowse-root`) and never touch your page's `html`/`body`; import
+`freebrowse/style.css` once. Working examples for both entries live in
+[`frontend/examples/`](frontend/examples/).
+
+Releasing (maintainers): bump `version` in `frontend/package.json` (the app and the package
+share it; pre-merge builds use a `-next.N` suffix), then from `frontend/`:
+
+```bash
+npm run build:package && npm run pack:check   # publint + arethetypeswrong on the tarball
+npm publish --tag next                         # `latest` is reserved for the main-branch release
+```
+
 ## Driving FreeBrowse from your own code
 
 FreeBrowse's UI is a *derived view* of its NiiVue instance: the React store is
