@@ -8,7 +8,7 @@ import {
 } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
 import { registerNiiVueEvents } from "./niivue-sync";
-import { createStoreSyncTarget } from "./niivue-store-sync";
+import { createStoreSyncTarget, readViewerFromNiiVue } from "./niivue-store-sync";
 
 // The adapter reads sliceType/showRender for viewMode; the v2 mock exposes them.
 type Reader = NiiVue & { sliceType: number; showRender: number };
@@ -139,5 +139,31 @@ describe("createStoreSyncTarget — niivue events drive the store", () => {
     nv.isColorbarVisible = false;
     void nv.addVolume({ url: "b.nii" });
     expect(useFreeBrowseStore.getState().volumeVersion).toBe(before);
+  });
+});
+
+
+describe("readViewerFromNiiVue — nv -> store seeding", () => {
+  test("maps every mirrored setting the instance reports and skips the rest", () => {
+    const nv = new NiiVue();
+    nv.sliceType = 4;
+    nv.showRender = 1;
+    nv.isRadiological = true;
+    nv.volumeIsNearestInterpolation = false;
+    nv.crosshairWidth = 0;
+    const patch = readViewerFromNiiVue(nv);
+    expect(patch).toEqual({
+      viewMode: "render",
+      isRadiologicalConvention: true,
+      interpolateVoxels: true,
+      crosshairVisible: false,
+    });
+  });
+
+  test("settings the instance does not report are left out of the patch", () => {
+    const nv = new NiiVue();
+    // The mock's flat setters are unset until written; only sliceType/showRender
+    // have defaults, so the patch carries just the view mode.
+    expect(readViewerFromNiiVue(nv)).toEqual({ viewMode: "ACS" });
   });
 });

@@ -38,9 +38,19 @@ export interface FreeBrowseProps {
    * (app: true; library: false).
    */
   exposeGlobal?: boolean;
+  /**
+   * The instance belongs to the host: FreeBrowse must not push its stored
+   * viewer defaults (view mode, crosshair, ruler, …) onto it. The store is
+   * seeded FROM the instance instead. Default false (the app owns its instance).
+   */
+  hostInstance?: boolean;
 }
 
-export default function FreeBrowse({ nv, exposeGlobal }: FreeBrowseProps) {
+export default function FreeBrowse({
+  nv,
+  exposeGlobal,
+  hostInstance = false,
+}: FreeBrowseProps) {
   const expose = exposeGlobal ?? getFreeBrowseConfig().exposeGlobal;
   const nvRef = useRef<NiiVue | null>(nv);
   nvRef.current = nv;
@@ -64,7 +74,7 @@ export default function FreeBrowse({ nv, exposeGlobal }: FreeBrowseProps) {
     applyViewerOptions,
     syncViewerOptionsFromNiiVue,
     debouncedGLUpdate,
-  } = useViewerOptions(nvRef, true);
+  } = useViewerOptions(nvRef, hostInstance ? "sync" : "apply");
   const {
     updateSurfaceDetails,
     toggleSurfaceVisibility,

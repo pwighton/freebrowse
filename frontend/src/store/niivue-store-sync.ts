@@ -3,7 +3,7 @@ import { DRAG_MODE } from "@niivue/niivue";
 import { sliceTypeMap } from "@/lib/niivue-helpers";
 import { useFreeBrowseStore } from "@/store";
 import type { DragMode } from "@/components/drag-mode-selector";
-import type { ViewMode } from "@/store/types";
+import type { ViewerOptions, ViewMode } from "@/store/types";
 import type { NiiVueEventSource, NiiVueSyncTarget } from "./niivue-sync";
 
 /**
@@ -23,9 +23,20 @@ import type { NiiVueEventSource, NiiVueSyncTarget } from "./niivue-sync";
  */
 
 /** niivue reader surface this adapter needs beyond the event target. */
-type NiiVueReader = NiiVueEventSource & {
+export type NiiVueReader = NiiVueEventSource & {
   sliceType: number;
   showRender: number;
+  // Flat settings mirrored into viewerOptions (read back by readViewerFromNiiVue).
+  crosshairWidth?: number;
+  crosshairGap?: number;
+  crosshairColor?: number[];
+  rulerWidth?: number;
+  isRulerVisible?: boolean;
+  volumeIsNearestInterpolation?: boolean;
+  volumeOutlineWidth?: number;
+  isColorbarVisible?: boolean;
+  isRadiological?: boolean;
+  secondaryDragMode?: number;
 };
 
 /** Minimal mesh shape read when rebuilding the surfaces list. */
@@ -67,6 +78,89 @@ function viewModeFromNiiVue(nv: NiiVueReader): ViewMode {
   return (bySlice?.[0] as ViewMode) ?? "ACS";
 }
 
+/**
+ * The niivue flat setting -> viewerOptions mapping, in one place. Used by the
+ * `change` event handler (one property at a time) and by `readViewerFromNiiVue`
+ * (all of them at once) so the two can never disagree. Returns null for a
+ * property FreeBrowse has no UI for.
+ *
+ * NOTE: crosshairWidth/crosshairVisible are store-owned UI state and are NOT
+ * mirrored from `change` events: niivue only has one crosshairWidth (0 ==
+ * hidden), so deriving it back would lose the remembered width while hidden.
+ * The use-viewer-options handlers own that pair. `readViewerFromNiiVue` does
+ * read it once, when seeding from a host-owned instance, since there is no
+ * remembered width to lose yet.
+ */
+function viewerPatchFor(
+  nv: NiiVueReader,
+  property: string,
+  value: unknown,
+): Partial<ViewerOptions> | null {
+  switch (property) {
+    case "crosshairGap":
+      return { crosshairGap: value as number };
+    case "crosshairColor":
+      return { crosshairColor: value as ViewerOptions["crosshairColor"] };
+    case "rulerWidth":
+      return { rulerWidth: value as number };
+    case "isRulerVisible":
+      return { rulerVisible: value as boolean };
+    case "volumeIsNearestInterpolation":
+      return { interpolateVoxels: !value };
+    case "volumeOutlineWidth":
+      return { overlayOutlineWidth: value as number };
+    case "isColorbarVisible":
+      return { isColorbar: value as boolean };
+    case "isRadiological":
+      return { isRadiologicalConvention: value as boolean };
+    case "secondaryDragMode":
+      return { dragMode: dragModeName(value) };
+    case "sliceType":
+    case "showRender":
+      return { viewMode: viewModeFromNiiVue(nv) };
+    default:
+      return null;
+  }
+}
+
+const MIRRORED_PROPS = [
+  "crosshairGap",
+  "crosshairColor",
+  "rulerWidth",
+  "isRulerVisible",
+  "volumeIsNearestInterpolation",
+  "volumeOutlineWidth",
+  "isColorbarVisible",
+  "isRadiological",
+  "secondaryDragMode",
+  "sliceType",
+] as const;
+
+/**
+ * Read the instance's current settings as a viewerOptions patch — the
+ * nv -> store direction, for seeding the store from an instance the host
+ * built (so FreeBrowse never pushes its own defaults onto it). Only settings
+ * the instance actually reports (not undefined) are included, so a partial
+ * reader (or the test mock) leaves the rest of the store alone.
+ */
+export function readViewerFromNiiVue(nv: NiiVueReader): Partial<ViewerOptions> {
+  const patch: Partial<ViewerOptions> = {};
+  for (const prop of MIRRORED_PROPS) {
+    const value = (nv as unknown as Record<string, unknown>)[prop];
+    if (value === undefined) continue;
+    Object.assign(patch, viewerPatchFor(nv, prop, value));
+  }
+  if (typeof nv.crosshairWidth === "number") {
+    if (nv.crosshairWidth > 0) {
+      patch.crosshairVisible = true;
+      patch.crosshairWidth = nv.crosshairWidth;
+    } else {
+      patch.crosshairVisible = false;
+    }
+  }
+  return patch;
+}
+
 export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
   const store = () => useFreeBrowseStore.getState();
   const patchViewer = (partial: Record<string, unknown>) =>
@@ -74,48 +168,10 @@ export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
 
   return {
     onViewerOptionChange(property, value) {
-      // Map niivue-mono flat property names -> FreeBrowse viewerOptions.
-      // Properties niivue emits that FreeBrowse has no UI for fall through.
-      switch (property) {
-        // NOTE: crosshairWidth/crosshairVisible are store-owned UI state, not
-        // derived here. niivue only has one crosshairWidth (0 == hidden), so
-        // deriving it back would lose the remembered width while hidden. The
-        // use-viewer-options handlers own that pair (store + nv). We only mirror
-        // it OUT (store -> nv), never back in.
-        case "crosshairGap":
-          patchViewer({ crosshairGap: value });
-          break;
-        case "crosshairColor":
-          patchViewer({ crosshairColor: value });
-          break;
-        case "rulerWidth":
-          patchViewer({ rulerWidth: value });
-          break;
-        case "isRulerVisible":
-          patchViewer({ rulerVisible: value });
-          break;
-        case "volumeIsNearestInterpolation":
-          patchViewer({ interpolateVoxels: !value });
-          break;
-        case "volumeOutlineWidth":
-          patchViewer({ overlayOutlineWidth: value });
-          break;
-        case "isColorbarVisible":
-          patchViewer({ isColorbar: value });
-          break;
-        case "isRadiological":
-          patchViewer({ isRadiologicalConvention: value });
-          break;
-        case "secondaryDragMode":
-          patchViewer({ dragMode: dragModeName(value) });
-          break;
-        case "sliceType":
-        case "showRender":
-          patchViewer({ viewMode: viewModeFromNiiVue(nv) });
-          break;
-        default:
-          break;
-      }
+      // Map niivue-mono flat property names -> FreeBrowse viewerOptions (see
+      // viewerPatchFor). Properties FreeBrowse has no UI for fall through.
+      const patch = viewerPatchFor(nv, property, value);
+      if (patch) patchViewer(patch);
     },
 
     onDrawingOptionChange(property, value) {

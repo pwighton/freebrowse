@@ -31,6 +31,9 @@ describe("FreeBrowse", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     delete window.freebrowse;
+    useFreeBrowseStore.setState({
+      viewerOptions: { ...useFreeBrowseStore.getInitialState().viewerOptions },
+    });
   });
 
   it("mounts empty (drop zone, no volumes) and exposes the given instance on window.freebrowse", async () => {
@@ -102,6 +105,40 @@ describe("FreeBrowse", () => {
     await act(async () => {
       useFreeBrowseStore.setState({ settingsDialogOpen: false });
     });
+  });
+
+  it("by default the app pushes its stored viewer defaults onto the instance", async () => {
+    const nv: Nv = createFreeBrowseInstance();
+    nv.isRadiological = true; // set before mount, contrary to the store default
+    nv.crosshairGap = 99;
+    await act(async () => {
+      render(<FreeBrowse nv={nv} />);
+    });
+    // Store defaults (isRadiologicalConvention false, crosshairGap 10) win.
+    // (The view mode is the one setting the adapter reads from the instance at
+    // registration time, so it is not a useful probe here.)
+    expect(nv.isRadiological).toBe(false);
+    expect(nv.crosshairGap).toBe(10);
+  });
+
+  it("hostInstance: the host's settings survive mount and the store reflects them", async () => {
+    const nv: Nv = createFreeBrowseInstance();
+    nv.sliceType = 2;
+    nv.showRender = 0;
+    nv.isRadiological = true;
+    nv.crosshairWidth = 0.7;
+    nv.crosshairGap = 4;
+    await act(async () => {
+      render(<FreeBrowse nv={nv} hostInstance />);
+    });
+    expect(nv.sliceType).toBe(2);
+    expect(nv.isRadiological).toBe(true);
+    const o = useFreeBrowseStore.getState().viewerOptions;
+    expect(o.viewMode).toBe("sagittal");
+    expect(o.isRadiologicalConvention).toBe(true);
+    expect(o.crosshairVisible).toBe(true);
+    expect(o.crosshairWidth).toBe(0.7);
+    expect(o.crosshairGap).toBe(4);
   });
 
   it("a slice-type change on the instance is mirrored into the store's view mode", async () => {

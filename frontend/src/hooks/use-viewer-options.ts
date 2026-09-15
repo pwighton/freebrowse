@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
+import { readViewerFromNiiVue } from "@/store/niivue-store-sync";
 import { sliceTypeMap } from "@/lib/niivue-helpers";
 import { DRAG_MODE, type NiiVue } from "@niivue/niivue";
 import type { DragMode } from "@/components/drag-mode-selector";
@@ -12,10 +13,21 @@ import type { ViewMode } from "@/store/types";
  * store themselves. The single exception is crosshairWidth/crosshairVisible,
  * which is store-owned UI state (niivue has only one crosshairWidth where 0
  * means hidden, so it can't remember the width while hidden).
+ *
+ * One-time init on mount, chosen by `init` (only the viewer component that owns
+ * the mount passes it; other consumers of the handlers leave it at "none"):
+ *   - `"apply"` (the app, which built the instance): push the store's viewer
+ *     defaults onto the instance once (`applyViewerOptions`).
+ *   - `"sync"`  (a host-owned instance): never touch the instance's settings;
+ *     seed the store FROM it instead (`syncViewerOptionsFromNiiVue`), so the
+ *     UI reflects what the host configured.
+ *   - `"none"`  (default): handlers only.
  */
+export type ViewerOptionsInit = "apply" | "sync" | "none";
+
 export function useViewerOptions(
   nvRef: React.RefObject<NiiVue | null>,
-  autoApply = false,
+  init: ViewerOptionsInit = "none",
 ) {
   const viewerOptions = useFreeBrowseStore((s) => s.viewerOptions);
   const setViewerOptions = useFreeBrowseStore((s) => s.setViewerOptions);
@@ -65,18 +77,25 @@ export function useViewerOptions(
     }
   }, [nvRef]);
 
-  // Replaced by the event adapter; kept as a no-op for signature stability
-  // (still passed into use-file-loading).
-  const syncViewerOptionsFromNiiVue = useCallback(() => {}, []);
+  // niivue -> store read-back: seed viewerOptions from the instance's current
+  // settings (only the ones it reports). Steady-state changes still arrive
+  // through the event adapter; this is the one-shot for a host-owned instance.
+  const syncViewerOptionsFromNiiVue = useCallback(() => {
+    const nv = nvRef.current;
+    if (!nv) return;
+    const patch = readViewerFromNiiVue(nv);
+    if (Object.keys(patch).length === 0) return;
+    setViewerOptions((prev) => ({ ...prev, ...patch }));
+  }, [nvRef, setViewerOptions]);
 
-  // One-time init: seed the instance from store defaults on mount.
+  // One-time init, direction per `init` (see the docblock).
   const didInit = useRef(false);
   useEffect(() => {
-    if (autoApply && !didInit.current && nvRef.current) {
-      didInit.current = true;
-      applyViewerOptions();
-    }
-  }, [autoApply, applyViewerOptions, nvRef]);
+    if (init === "none" || didInit.current || !nvRef.current) return;
+    didInit.current = true;
+    if (init === "apply") applyViewerOptions();
+    else syncViewerOptionsFromNiiVue();
+  }, [init, applyViewerOptions, syncViewerOptionsFromNiiVue, nvRef]);
 
   const handleViewMode = useCallback(
     (mode: ViewMode) => {
