@@ -26,7 +26,7 @@ export default defineConfig({
   },
   publicDir: false, // favicon etc. belong to the app, not the package
   build: {
-    outDir: "dist",
+    outDir: "dist-lib", // the app build owns dist/
     emptyOutDir: entry === "index",
     sourcemap: true,
     lib: {

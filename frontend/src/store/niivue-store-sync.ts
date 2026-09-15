@@ -198,9 +198,15 @@ export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
       }
     },
 
-    onVolumesChanged() {
+    onVolumesChanged(volumes) {
       // The sidebar/scene UI reads live nv.volumes; bump the version to re-render.
-      store().incrementVolumeVersion();
+      const s = store();
+      s.incrementVolumeVersion();
+      // The drop zone covers the canvas until something is loaded. FreeBrowse's
+      // own load paths hide it before loading; a volume added straight through
+      // the niivue API (an embedding host, the console) must hide it too, or the
+      // canvas is never mounted and nothing renders.
+      if (volumes.length > 0 && s.showUploader) s.setShowUploader(false);
     },
 
     onVolumeUpdated() {

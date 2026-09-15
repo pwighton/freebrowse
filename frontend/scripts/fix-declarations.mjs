@@ -25,4 +25,4 @@ function walk(dir) {
     }
   }
 }
-walk(new URL("../dist/types", import.meta.url).pathname);
+walk(new URL("../dist-lib/types", import.meta.url).pathname);

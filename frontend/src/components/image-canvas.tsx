@@ -2,7 +2,6 @@
 
 import { useRef, useEffect, useState } from "react";
 import { NiiVue } from "@niivue/niivue";
-import { sliceTypeMap } from "@/lib/niivue-helpers";
 
 interface ImageCanvasProps {
   viewMode: "axial" | "coronal" | "sagittal" | "ACS" | "ACSR" | "render";
@@ -21,7 +20,11 @@ export default function ImageCanvas({ viewMode, nvRef }: ImageCanvasProps) {
     if (!canvas) return;
     if (!nv) return;
     nv.attachToCanvas(canvas);
-    nv.sliceType = sliceTypeMap[viewMode]?.sliceType || 0; // Default to axial if viewMode is invalid;
+    // Deliberately no `nv.sliceType = ...` here: the view mode is owned by
+    // use-viewer-options (app: pushed from the store on init; host-owned
+    // instance: read FROM the instance). Setting it on canvas mount would
+    // clobber a host's slice type with the store's stale value, because this
+    // child effect runs before the parent's init effect.
     setImageLoaded(true);
     // Mount-once: attach the canvas exactly once. Later view-mode changes are
     // applied through use-viewer-options, never by re-attaching.

@@ -8,7 +8,7 @@
     "declarationMap": false,
     "allowImportingTsExtensions": false,
     "rootDir": "./src",
-    "outDir": "./dist/types"
+    "outDir": "./dist-lib/types"
   },
   "include": [
     "src/lib.ts",

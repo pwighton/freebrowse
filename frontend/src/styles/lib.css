@@ -4,17 +4,28 @@
  *
  * Everything here is scoped to `.freebrowse-root` — the element ViewerShell
  * renders — so a host page keeps its own look:
- *   - Tailwind is imported WITHOUT preflight (theme + utilities only); a small
- *     scoped reset below gives FreeBrowse's own elements the parts of preflight
- *     they rely on.
+ *   - Tailwind is imported WITHOUT preflight (theme + utilities only); the
+ *     scoped reset in ./reset.css gives FreeBrowse's own elements the parts of
+ *     preflight they rely on.
  *   - Design tokens (shadcn "neutral") live on `.freebrowse-root`, dark values on
  *     `.freebrowse-root.dark`, and the `dark:` variant keys off that class.
  *   - No `html`, `body`, `:root` or bare-element selectors.
+ *
+ * Cascade layers and `important`, deliberately. A host page's ordinary
+ * unlayered rules (`h1 {}`, `p {}`, `button {}`) beat ANY layered rule
+ * regardless of specificity, so if FreeBrowse's styles were layered the host's
+ * would leak INTO the viewer. Hence: theme variables stay layered (they only
+ * set custom properties), the utilities are emitted unlayered and `!important`
+ * (Tailwind's `important` option — the documented setting for widgets that
+ * live inside someone else's page), and the scoped reset is a plain,
+ * `@apply`-free file imported without a layer so Tailwind leaves it unlayered;
+ * its `.freebrowse-root el` selectors (0,1,1) then beat host `el {}` rules.
  */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss/utilities.css" important;
 @import "tw-animate-css";
+@import "./reset.css";
 
 @custom-variant dark (&:is(.freebrowse-root.dark *));
 
@@ -125,86 +136,22 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-@layer base {
-  /* Scoped subset of Tailwind preflight: what FreeBrowse's markup depends on. */
-  .freebrowse-root,
-  .freebrowse-root *,
-  .freebrowse-root ::before,
-  .freebrowse-root ::after {
-    box-sizing: border-box;
-    border-width: 0;
-    border-style: solid;
-    @apply border-border outline-ring/50;
-  }
-  .freebrowse-root {
-    @apply bg-background text-foreground;
-    margin: 0;
-    line-height: 1.5;
-    -webkit-text-size-adjust: 100%;
-    tab-size: 4;
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    font-weight: 400;
-  }
-  .freebrowse-root :is(h1, h2, h3, h4, h5, h6, p, ul, ol, dl, dd, figure, blockquote, pre, hr) {
-    margin: 0;
-  }
-  .freebrowse-root :is(h1, h2, h3, h4, h5, h6) {
-    font-size: inherit;
-    font-weight: inherit;
-  }
-  .freebrowse-root :is(ul, ol) {
-    list-style: none;
-    padding: 0;
-  }
-  .freebrowse-root a {
-    color: inherit;
-    text-decoration: inherit;
-  }
-  .freebrowse-root :is(button, input, optgroup, select, textarea) {
-    font: inherit;
-    letter-spacing: inherit;
-    color: inherit;
-    background-color: transparent;
-    border-radius: 0;
-    margin: 0;
-    padding: 0;
-  }
-  .freebrowse-root :is(button, [role="button"], input:where([type="button"], [type="reset"], [type="submit"])) {
-    appearance: button;
-    cursor: pointer;
-  }
-  .freebrowse-root :is(input, textarea)::placeholder {
-    opacity: 1;
-    color: color-mix(in oklab, currentcolor 50%, transparent);
-  }
-  .freebrowse-root :is(img, svg, video, canvas, audio, iframe, embed, object) {
-    display: block;
-    vertical-align: middle;
-  }
-  .freebrowse-root :is(img, video) {
-    max-width: 100%;
-    height: auto;
-  }
-  .freebrowse-root table {
-    border-collapse: collapse;
-    text-indent: 0;
-    border-color: inherit;
-  }
-  .freebrowse-root :is(:disabled) {
-    cursor: default;
-  }
-  .freebrowse-root [hidden]:where(:not([hidden="until-found"])) {
-    display: none !important;
-  }
-}
-
-/* Viewer layout (was App.css, unscoped). */
+/* Viewer layout (was App.css, unscoped).
+   The canvas is absolutely positioned inside its (relative) container so its
+   100% width/height resolve against that box no matter how the host lays the
+   page out. With a plain `height: 100%` the percentage cannot resolve inside an
+   embedded flex chain, the canvas falls back to its pixel attributes — which
+   niivue sets to CSS size × devicePixelRatio — and on a HiDPI screen the element
+   grows to twice the panel and is clipped. */
 .freebrowse-root .niivue-canvas {
+  position: relative;
   width: 100%;
-  height: 95%;
+  height: 100%;
+  overflow: hidden;
 }
 .freebrowse-root .niivue-canvas canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;

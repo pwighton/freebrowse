@@ -33,6 +33,7 @@ describe("FreeBrowse", () => {
     delete window.freebrowse;
     useFreeBrowseStore.setState({
       viewerOptions: { ...useFreeBrowseStore.getInitialState().viewerOptions },
+      showUploader: true,
     });
   });
 
