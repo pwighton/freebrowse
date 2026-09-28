@@ -31,6 +31,7 @@ export const DRAG_MODE = {
   angle: 7,
   crosshair: 8,
   windowing: 9,
+  crosshairPan: 10,
 } as const;
 
 export const SHOW_RENDER = {
