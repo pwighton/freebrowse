@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { NiiVue } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
+import { FREEBROWSE_SAVE_SETTINGS } from "@/lib/default-niivue-options";
 import { useSave } from "./use-save";
 
 type SaveRef = Parameters<typeof useSave>[0];
@@ -65,6 +66,26 @@ describe("useSave — serializeDocument options", () => {
     expect(serialize).toHaveBeenCalledWith({
       format: "json",
       linkData: true,
+      settings: FREEBROWSE_SAVE_SETTINGS,
+    });
+  });
+
+  test("every save omits volume.matcap (niivue/mono#225)", async () => {
+    // niivue-mono writes its bundled cortex matcap into every document as a
+    // ~23 KB data URL; FreeBrowse has no matcap UI, so it never saves it.
+    expect(FREEBROWSE_SAVE_SETTINGS).toEqual({ neverSave: ["volume.matcap"] });
+    const nv = nvWithVolume();
+    const serialize = vi.spyOn(nv, "serializeDocument");
+    primeSaveState({ isDownloadMode: false, format: "cbor" });
+
+    const { result } = renderHook(() => useSave(refOf(nv)));
+    await act(async () => {
+      await result.current.handleConfirmSave();
+    });
+
+    expect(serialize).toHaveBeenCalledWith({
+      linkData: true,
+      settings: FREEBROWSE_SAVE_SETTINGS,
     });
   });
 
@@ -97,6 +118,9 @@ describe("useSave — serializeDocument options", () => {
       await result.current.handleConfirmSave();
     });
 
-    expect(serialize).toHaveBeenCalledWith({ format: "cbor" });
+    expect(serialize).toHaveBeenCalledWith({
+      format: "cbor",
+      settings: FREEBROWSE_SAVE_SETTINGS,
+    });
   });
 });

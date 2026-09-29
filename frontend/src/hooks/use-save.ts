@@ -3,6 +3,7 @@ import { useFreeBrowseStore } from "@/store";
 import { gzipUint8Array, uint8ArrayToBase64 } from "@/lib/niivue-helpers";
 import { retargetVolumeUrls } from "@/lib/nvd-volume-urls";
 import { requestImagingUploadConfirmation } from "@/lib/confirmations";
+import { FREEBROWSE_SAVE_SETTINGS } from "@/lib/default-niivue-options";
 import { dataUrl } from "@/lib/deployment-config";
 import type { NvdFormat } from "@/store/types";
 import type { NiiVue } from "@niivue/niivue";
@@ -76,7 +77,10 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
           const format = saveState.document.format;
           // niivue serializes both encodings natively; `loadDocument` sniffs
           // them apart on the way back in. Embeds everything, meshes included.
-          const bytes = nvRef.current.serializeDocument({ format });
+          const bytes = nvRef.current.serializeDocument({
+            format,
+            settings: FREEBROWSE_SAVE_SETTINGS,
+          });
           downloadBytes(
             bytes,
             filename,
@@ -138,7 +142,10 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
             // keep the url they were loaded from. The save dialog offers CBOR
             // in download mode only.
             data = uint8ArrayToBase64(
-              nvRef.current.serializeDocument({ linkData: true }),
+              nvRef.current.serializeDocument({
+                linkData: true,
+                settings: FREEBROWSE_SAVE_SETTINGS,
+              }),
             );
           } else {
             // Parse back to an object: the backend stores `data` as a dict and
@@ -147,6 +154,7 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
               nvRef.current.serializeDocument({
                 format: "json",
                 linkData: true,
+                settings: FREEBROWSE_SAVE_SETTINGS,
               }),
             );
             data = retargetVolumeUrls(
