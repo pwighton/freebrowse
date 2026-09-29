@@ -85,27 +85,39 @@ describe("applyLabelColormapsAfterLoad — label palettes named by colormap only
   });
 });
 
-describe("useVolumes — visibility toggle (opacity, by id)", () => {
+describe("useVolumes — visibility toggle (niivue `visible`, by id)", () => {
   beforeEach(() => {
     useFreeBrowseStore.setState({ currentImageIndex: null });
   });
 
-  test("hides a visible volume via opacity 0", () => {
+  test("hides a shown volume with visible: false, leaving opacity alone", () => {
     const nv = new NiiVue();
-    nv.volumes.push({ id: "vol-0", opacity: 1 });
+    nv.volumes.push({ id: "vol-0", opacity: 0.5 });
     const spy = vi.spyOn(nv, "setVolume");
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
     act(() => result.current.toggleImageVisibility("vol-0"));
-    expect(spy).toHaveBeenCalledWith(0, { opacity: 0 });
+    expect(spy).toHaveBeenCalledWith(0, { visible: false });
+    expect(nv.volumes[0].opacity).toBe(0.5);
   });
 
-  test("shows a hidden volume via opacity 1", () => {
+  test("shows a hidden volume with visible: true; the opacity comes back as it was", () => {
+    const nv = new NiiVue();
+    nv.volumes.push({ id: "vol-0", opacity: 0.5, visible: false });
+    const spy = vi.spyOn(nv, "setVolume");
+    const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
+    act(() => result.current.toggleImageVisibility("vol-0"));
+    expect(spy).toHaveBeenCalledWith(0, { visible: true });
+    expect(nv.volumes[0].opacity).toBe(0.5);
+    expect(nv.volumes[0].visible).toBe(true);
+  });
+
+  test("a volume at opacity 0 is still toggled by the flag, not by opacity", () => {
     const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0", opacity: 0 });
     const spy = vi.spyOn(nv, "setVolume");
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
     act(() => result.current.toggleImageVisibility("vol-0"));
-    expect(spy).toHaveBeenCalledWith(0, { opacity: 1 });
+    expect(spy).toHaveBeenCalledWith(0, { visible: false });
   });
 });
 
