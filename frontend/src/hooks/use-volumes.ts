@@ -78,12 +78,11 @@ export function useVolumes(
       const volumeIndex = nv.volumes.findIndex((v) => v.id === id);
       if (volumeIndex < 0) return;
 
+      // niivue-mono's `visible` flag hides a volume without touching its
+      // opacity, so a hide/show round trip restores the user's value (it used
+      // to be encoded as opacity 0 and came back as 1).
       const volume = nv.volumes[volumeIndex];
-      const opacity = volume.opacity ?? 1.0;
-      const isCurrentlyVisible = opacity > 0;
-      const newOpacity = isCurrentlyVisible ? 0 : opacity === 0 ? 1.0 : opacity;
-
-      void nv.setVolume(volumeIndex, { opacity: newOpacity });
+      void nv.setVolume(volumeIndex, { visible: volume.visible === false });
       incrementVolumeVersion();
     },
     [nvRef, incrementVolumeVersion],

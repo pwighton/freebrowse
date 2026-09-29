@@ -104,7 +104,7 @@ export default function SceneDetailsTab({
                       if (volume.id) onToggleVisibility(volume.id);
                     }}
                   >
-                    {(volume.opacity ?? 1) > 0 ? (
+                    {volume.visible !== false ? (
                       <Eye className="h-3 w-3" />
                     ) : (
                       <EyeOff className="h-3 w-3 opacity-50" />
