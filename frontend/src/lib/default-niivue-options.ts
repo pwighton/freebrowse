@@ -1,4 +1,8 @@
-import { NiiVue, type NiiVueOptions } from "@niivue/niivue";
+import {
+  NiiVue,
+  type NiiVueOptions,
+  type SettingsSavePolicy,
+} from "@niivue/niivue";
 
 /**
  * The options FreeBrowse constructs its NiiVue instance with. Shared by the
@@ -20,6 +24,21 @@ export const QA_VIEWER_NIIVUE_OPTIONS: Partial<NiiVueOptions> = {
   crosshairColor: [1.0, 0.88, 0.88, 1.0],
   crosshairWidth: 0.3,
   crosshairGap: 10,
+};
+
+/**
+ * Settings policy for every document FreeBrowse saves.
+ *
+ * `volume.matcap` is omitted: niivue-mono applies its bundled `cortex` matcap
+ * to every instance but declares the default as `''`, so the sparsifier can
+ * never elide it and each saved document carries the matcap as a ~23 KB
+ * `data:image/jpeg;base64,…` URL -- 88% of a typical FreeBrowse save
+ * (niivue/mono#225). FreeBrowse exposes no matcap UI, so nothing a user chose
+ * is lost; on load an omitted matcap falls back to the instance's own. Remove
+ * once #225 is fixed upstream.
+ */
+export const FREEBROWSE_SAVE_SETTINGS: SettingsSavePolicy = {
+  neverSave: ["volume.matcap"],
 };
 
 /**
