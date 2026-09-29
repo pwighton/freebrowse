@@ -11,10 +11,12 @@ import { useFreeBrowseStore } from "@/store";
 import type { DrawingOptions } from "@/store/types";
 
 /**
- * Magic-wand (click-to-segment) rebuilt on `@niivue/nv-ext-drawing` (Phase 4c).
- * niivue-mono removed `clickToSegment` from core, so the wand is an extension:
+ * Magic-wand (click-to-segment) rebuilt on `@niivue/nv-ext-drawing` (Phase 4c):
  * an intensity flood-fill seeded from the pointer, painted into the active
  * drawing layer, honoring the store's threshold / 2D-only / max-distance params.
+ * niivue-mono has grown its own click-to-segment wand since (`draw.isClickToSegment`),
+ * but the extension is what gives us the hover preview and the max-distance
+ * limit, so FreeBrowse stays on it.
  *
  * **Hover preview (4c.2):** the fill previews live as the pointer moves and only
  * commits on click. niivue-mono has no separate preview overlay — the preview
@@ -30,8 +32,11 @@ import type { DrawingOptions } from "@/store/types";
  * zero-copy `MagicWandShared` preview (faster on large volumes, needs COOP/COEP)
  * is a Phase 7 perf upgrade.
  *
- * NOTE: no undo snapshot — niivue-mono exposes no public snapshot-push API, so a
- * wand fill is NOT on the pen undo stack (Phase 7; see the migration plan).
+ * **Undo:** every committed fill pushes one undo snapshot first
+ * (`ctx.drawing.pushUndo()`, niivue-mono >= the drawing-undo-snapshot branch), so
+ * the drawing tab's Undo reverts a wand fill like a pen stroke. Previews never
+ * push. On the preview-then-click path the preview is already in the drawing,
+ * so the commit puts the pre-preview bitmap back, pushes, then re-applies it.
  */
 
 function buildWandOptions(
@@ -74,6 +79,7 @@ export async function runMagicWand(
     buildWandOptions(opts, bg, sliceType),
     drawing.voxelSizeMM,
   );
+  drawing.pushUndo(); // one snapshot per committed fill
   drawing.update(bitmap);
 }
 
@@ -163,9 +169,17 @@ export function useMagicWand(nvRef: React.RefObject<NiiVue | null>): void {
       if (!ctx.drawing || !ctx.backgroundVolume?.imgRAS) return;
       pendingRef.current = null;
       if (committedRef.current != null) {
-        // An active preview already shows the fill at this location — keep it.
-        // Any in-flight preview is intentionally NOT discarded (it lands the
-        // same commit); the snapshot is dropped so the next hover re-snapshots.
+        // An active preview already shows the fill at this location — commit
+        // it. The preview is already in the drawing, so to make the commit
+        // undoable: put the pre-preview bitmap back, push the undo snapshot,
+        // re-apply the preview. Any in-flight preview is intentionally NOT
+        // discarded (it lands the same commit); the snapshot is dropped so the
+        // next hover re-snapshots.
+        const drawing = ctx.drawing;
+        const preview = drawing.bitmap.slice();
+        drawing.update(committedRef.current);
+        drawing.pushUndo();
+        drawing.update(preview);
         committedRef.current = null;
       } else if (!busyRef.current) {
         // No hover preview happened (e.g. a bare click) — one-shot commit.
