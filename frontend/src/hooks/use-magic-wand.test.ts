@@ -39,7 +39,13 @@ const DEFAULT: DrawingOptions = {
 
 /** Fake extension context shaped like the fields runMagicWand reads. */
 function fakeCtx(opts: { drawing?: boolean; imgRAS?: boolean } = {}) {
-  const update = vi.fn();
+  const calls: string[] = [];
+  const update = vi.fn(() => {
+    calls.push("update");
+  });
+  const pushUndo = vi.fn(() => {
+    calls.push("pushUndo");
+  });
   const drawing =
     (opts.drawing ?? true)
       ? {
@@ -47,6 +53,7 @@ function fakeCtx(opts: { drawing?: boolean; imgRAS?: boolean } = {}) {
           dims: { dimX: 2, dimY: 2, dimZ: 2 },
           voxelSizeMM: [1, 1, 1] as [number, number, number],
           update,
+          pushUndo,
         }
       : null;
   const backgroundVolume = {
@@ -57,7 +64,7 @@ function fakeCtx(opts: { drawing?: boolean; imgRAS?: boolean } = {}) {
     voxelSizeMM: [1, 1, 1] as [number, number, number],
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { ctx: { drawing, backgroundVolume } as any, update };
+  return { ctx: { drawing, backgroundVolume } as any, update, pushUndo, calls };
 }
 
 describe("runMagicWand — orchestration", () => {
@@ -100,11 +107,23 @@ describe("runMagicWand — orchestration", () => {
     expect(mockedMagicWand.mock.calls[0][4]).toMatchObject({ sliceAxis: 1 });
   });
 
+  test("pushes one undo snapshot, before the fill is applied", async () => {
+    mockedMagicWand.mockResolvedValue({
+      bitmap: new Uint8Array(8),
+      result: {},
+    } as never);
+    const { ctx, pushUndo, calls } = fakeCtx();
+    await runMagicWand(ctx, DEFAULT, [0, 0, 0], 0);
+    expect(pushUndo).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(["pushUndo", "update"]); // snapshot the pre-fill bitmap
+  });
+
   test("no-op without a drawing layer", async () => {
-    const { ctx, update } = fakeCtx({ drawing: false });
+    const { ctx, update, pushUndo } = fakeCtx({ drawing: false });
     await runMagicWand(ctx, DEFAULT, [0, 0, 0], 0);
     expect(mockedMagicWand).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
+    expect(pushUndo).not.toHaveBeenCalled();
   });
 
   test("no-op without background imgRAS", async () => {
@@ -243,15 +262,23 @@ describe("useMagicWand — hover preview (4c.2)", () => {
     expect(updates.filter((a) => a === "update")).toHaveLength(2); // preview + restore
   });
 
-  test("click after a preview commits by keeping it (no extra flood)", async () => {
+  test("click after a preview commits by keeping it (no extra flood), with one undo snapshot", async () => {
     const nv = ready();
+    const updates: (string | undefined)[] = [];
+    nv.addEventListener("drawingChanged", (e) =>
+      updates.push((e as CustomEvent).detail?.action),
+    );
     await move(nv, [1, 1, 1]);
     await vi.waitFor(() => expect(mockedMagicWand).toHaveBeenCalledTimes(1));
+    expect(nv.undoPushes).toBe(0); // previews never push
     await act(async () => {
       nv.emit("slicePointerUp", { voxel: [1, 1, 1], sliceType: 0 });
       await Promise.resolve();
     });
     expect(mockedMagicWand).toHaveBeenCalledTimes(1); // kept, not recomputed
+    expect(nv.undoPushes).toBe(1); // ... but made undoable:
+    // preview, then restore the pre-preview bitmap, push, re-apply the preview.
+    expect(updates.filter((a) => a === "update")).toHaveLength(3);
   });
 
   test("external drawing edit (undo) drops the snapshot so leave won't clobber", async () => {

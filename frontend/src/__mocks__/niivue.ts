@@ -328,6 +328,13 @@ export class NiiVue extends EventTarget {
     this.drawingVolume = null;
     this.emit("drawingChanged", { action: "close" });
   }
+  /** Undo snapshots pushed (by pushUndo / drawAddUndoBitmap) — asserted by tests. */
+  undoPushes = 0;
+  drawAddUndoBitmap(): void {
+    if (!this.drawingVolume) return;
+    this.undoPushes++;
+  }
+
   drawUndo(): void {
     this.emit("drawingChanged", { action: "undo" });
   }
@@ -416,6 +423,10 @@ export class MockExtensionContext {
     update: (b: Uint8Array): void => {
       this.lastUpdate = b;
       this.nv.emit("drawingChanged", { action: "update" });
+    },
+    // Real: pushes the current bitmap onto the controller's undo ring.
+    pushUndo: (): void => {
+      this.nv.drawAddUndoBitmap();
     },
   };
   private readonly _bg = {
