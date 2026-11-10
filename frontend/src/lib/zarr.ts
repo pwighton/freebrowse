@@ -1,0 +1,197 @@
+/**
+ * OME-Zarr loading for FreeBrowse, on top of `@niivue/nv-ext-tile/zarr`.
+ *
+ * This module covers the whole-level path: one pyramid level is read fully
+ * into memory and added as an ordinary volume, so everything that works on a
+ * NIfTI (drawing, save, voxel readout) works on it. Streaming is separate.
+ *
+ * The niivue extension is imported lazily so zarrita stays out of the main
+ * bundle until a store is actually opened.
+ */
+import type { NiiVue } from "@niivue/niivue";
+import type { OmeZarrSource } from "@niivue/nv-ext-tile/zarr";
+
+const loadZarrModule = () => import("@niivue/nv-ext-tile/zarr");
+
+export interface ZarrLevelInfo {
+  /** Pyramid level, 0 = finest. */
+  level: number;
+  /** Voxel grid in display order [x, y, z]. */
+  dims: [number, number, number];
+  /** Voxel spacing in display order, micrometres. */
+  spacingUm: [number, number, number];
+  dtype: string;
+  /** Decoded bytes for one channel at one timepoint. */
+  channelBytes: number;
+}
+
+export interface ZarrDescription {
+  /** Absolute store URL, without a trailing slash. */
+  url: string;
+  /** The multiscale's stated name, or null. */
+  name: string | null;
+  /** Resolution levels, finest first. */
+  levels: ZarrLevelInfo[];
+  /** One display name per channel. */
+  channels: string[];
+  timepoints: number;
+  /** The level a whole-level load picks when none is given. */
+  defaultLevel: number;
+}
+
+export interface LoadZarrLevelOptions {
+  /** Pyramid level to read (0 = finest). Default: finest within the budget. */
+  level?: number;
+  /** Channel indices to load. Default: every channel. */
+  channels?: number[];
+  timepoint?: number;
+  /** Per-channel budget for the automatic level pick. Default 256 MiB. */
+  levelBudgetBytes?: number;
+}
+
+export interface LoadedZarrLevel {
+  description: ZarrDescription;
+  /** The level that was read. */
+  level: number;
+  /** Ids of the volumes added to the scene, one per channel. */
+  volumeIds: string[];
+}
+
+/** Absolute form of a store URL, without a trailing slash or fragment. */
+export function resolveZarrUrl(url: string): string {
+  const resolved = new URL(url, document.baseURI);
+  resolved.hash = "";
+  resolved.pathname = resolved.pathname.replace(/\/+$/, "");
+  return resolved.href;
+}
+
+/** The store URL's path, or "" when it does not parse. */
+function pathOf(url: string): string {
+  try {
+    return new URL(url, document.baseURI).pathname;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Whether a URL names a zarr store by its path: any segment ending in `.zarr`
+ * (`x.ome.zarr`, `x.nii.zarr`, `x.zarr/0`). A fast path only: stores served by
+ * id, like DANDI's, need {@link probeZarr}.
+ */
+export function isZarrUrl(url: string): boolean {
+  return pathOf(url)
+    .split("/")
+    .some((segment) => /\.zarr$/i.test(segment));
+}
+
+/** Fetch a metadata key and parse it, or null for anything but a JSON object. */
+async function fetchJsonObject(
+  url: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    // A dev server or SPA host answers any path with its HTML page.
+    const parsed: unknown = JSON.parse(await response.text());
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ask the server whether a URL is a zarr group: its format version, or null.
+ * Looks for v3's `zarr.json`, then v2's `.zgroup` / `.zattrs`.
+ */
+export async function probeZarr(url: string): Promise<2 | 3 | null> {
+  let base: string;
+  try {
+    base = resolveZarrUrl(url);
+  } catch {
+    return null;
+  }
+  const v3 = await fetchJsonObject(`${base}/zarr.json`);
+  if (v3 && v3.zarr_format === 3) return 3;
+  if (await fetchJsonObject(`${base}/.zgroup`)) return 2;
+  if (await fetchJsonObject(`${base}/.zattrs`)) return 2;
+  return null;
+}
+
+function describe(
+  url: string,
+  source: OmeZarrSource,
+  channels: string[],
+  defaultLevel: number,
+): ZarrDescription {
+  return {
+    url,
+    name: source.info.name,
+    levels: source.levels.map((level, index) => ({
+      level: index,
+      dims: level.dims,
+      spacingUm: level.spacingUm,
+      dtype: level.dtype,
+      channelBytes: level.channelBytes,
+    })),
+    channels,
+    timepoints: source.timepointCount,
+    defaultLevel,
+  };
+}
+
+async function openZarr(url: string, levelBudgetBytes?: number) {
+  const zarr = await loadZarrModule();
+  const resolved = resolveZarrUrl(url);
+  const source = await zarr.fetchOmeZarr(resolved);
+  const channels = Array.from({ length: source.channelCount }, (_, c) =>
+    zarr.omeZarrChannelName(source, c),
+  );
+  const defaultLevel = zarr.defaultOmeZarrLevel(source, levelBudgetBytes);
+  return {
+    zarr,
+    source,
+    description: describe(resolved, source, channels, defaultLevel),
+  };
+}
+
+/**
+ * Read a store's metadata (levels, channels, timepoints) without reading any
+ * voxels. Throws when the URL is not a readable OME-Zarr image.
+ */
+export async function describeZarr(
+  url: string,
+  levelBudgetBytes?: number,
+): Promise<ZarrDescription> {
+  return (await openZarr(url, levelBudgetBytes)).description;
+}
+
+/**
+ * Load one whole pyramid level into memory and ADD it to the scene, one
+ * volume per channel. Existing volumes are kept (`nv.loadVolumes` would
+ * replace them).
+ */
+export async function loadZarrLevel(
+  nv: NiiVue,
+  url: string,
+  options: LoadZarrLevelOptions = {},
+): Promise<LoadedZarrLevel> {
+  const { zarr, source, description } = await openZarr(
+    url,
+    options.levelBudgetBytes,
+  );
+  const level = options.level ?? description.defaultLevel;
+  const volumes = await zarr.omeZarrVolumesFrom(source, { ...options, level });
+
+  const before = new Set(nv.volumes.map((v) => v.id));
+  for (const volume of volumes) {
+    await nv.addVolume(volume);
+  }
+  const volumeIds = nv.volumes
+    .map((v) => v.id)
+    .filter((id): id is string => !!id && !before.has(id));
+
+  return { description, level, volumeIds };
+}
