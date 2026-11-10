@@ -22,6 +22,7 @@ import { LabeledSliderWithInput } from "@/components/ui/labeled-slider-with-inpu
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useCapabilities } from "@/lib/capabilities";
+import { ZARR_SUPPORTED } from "@/lib/zarr";
 import { deploymentConfig } from "@/lib/deployment-config";
 import type { ZarrVolumeOrigin } from "@/store/zarr-slice";
 import type { NiiVue, NVImage } from "@niivue/niivue";
@@ -211,9 +212,19 @@ export default function SceneDetailsTab({
           <form className="flex gap-2" onSubmit={submitUrl}>
             <Input
               type="text"
-              aria-label={zarrMode ? "OME-Zarr store URL" : "Volume or zarr URL"}
+              aria-label={
+                zarrMode
+                  ? "OME-Zarr store URL"
+                  : ZARR_SUPPORTED
+                    ? "Volume or zarr URL"
+                    : "Volume URL"
+              }
               placeholder={
-                zarrMode ? "OME-Zarr store URL" : "Volume or OME-Zarr URL"
+                zarrMode
+                  ? "OME-Zarr store URL"
+                  : ZARR_SUPPORTED
+                    ? "Volume or OME-Zarr URL"
+                    : "Volume URL"
               }
               className="h-8 text-xs"
               value={urlText}

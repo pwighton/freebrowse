@@ -13,6 +13,9 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     'import.meta.env.VITE_SERVERLESS': JSON.stringify('true'),
+    // No OME-Zarr in the single file: the zarr library and its codecs would
+    // add about 3 MB to it. See ZARR_SUPPORTED in src/lib/zarr.ts.
+    'import.meta.env.VITE_NO_ZARR': JSON.stringify('true'),
   },
   resolve: {
     alias: {

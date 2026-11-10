@@ -274,6 +274,11 @@ standalone HTML file is available at
 
 Where `<version>` is the [current version of freebrowse](https://github.com/freesurfer/freebrowse/blob/main/frontend/package.json#L4)
 
+The single-file build does not include OME-Zarr support, which would more than
+double its size (see `VITE_NO_ZARR` under
+[Deployment configurations](#deployment-configurations)). To view zarr stores,
+use one of the other builds.
+
 The singlefile build is particularily useful with the python scripts in the
 [`scripts`](https://github.com/freesurfer/freebrowse/tree/main/scripts) directory
 to embed a niivue document and related imaging data directly into a the single
@@ -329,6 +334,7 @@ variables. These are read-only at runtime.
 | `VITE_DISABLE_DOWNLOAD` | `true` / unset | Disables the **Download** button and no-ops niivue's save-to-disk methods (`saveMesh`, `saveBitmap`, `saveDocument`, and `saveVolume` / `saveDrawing` whenever they are given a filename). In-memory exports (`saveVolume({filename: ""})`, `serializeDocument()`) keep working, so backend **Save**, AI sessions, save-drawing and edit-volume are unaffected. For deploying into secure environments where local data export should be turned off. |
 | `VITE_SERVERLESS` | `true` / unset | Builds for the `file://` protocol with no backend (set automatically by `build:serverless`). Also disables the backend **Save** button. |
 | `VITE_BASE_PATH` | e.g. `/freebrowse/` | Base URL path for routing/assets. |
+| `VITE_NO_ZARR` | `true` / unset | Builds without OME-Zarr support: no zarr streaming view (`/zarr`) and no loading of zarr stores in the default view. The zarr library and its codecs (about 3 MB) are left out of the build. Asking such a build for a store shows "OME-Zarr support is not included in this build." Always on for `build:singlefile`, where it is set in `vite.config.singlefile.ts` and cannot be turned off from the environment; unset for every other target. |
 
 How a file opens from the Jupyter file browser (document tab or browser tab, who
 downloads it) is not a build variable: it is runtime Jupyter server

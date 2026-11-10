@@ -7,6 +7,7 @@ import FreeBrowse from './components/freebrowse.tsx';
 import QaViewer from './components/qa-viewer.tsx';
 import { deploymentConfig } from './lib/deployment-config';
 import { applyExportLockdown } from './lib/disable-export';
+import { ZARR_SUPPORTED } from './lib/zarr';
 import {
   createFreeBrowseInstance,
   QA_VIEWER_NIIVUE_OPTIONS,
@@ -35,7 +36,15 @@ const Router = isServerless ? HashRouter : BrowserRouter;
 // case.)
 const hashQuery = (hash: string) =>
   hash.includes('?') ? hash.slice(hash.indexOf('?')) : '';
-if (isServerless) {
+if (!ZARR_SUPPORTED) {
+  // No zarr view in this build (the single file). Show the default view
+  // instead of a blank page, keeping the query so its loader reports that the
+  // store cannot be opened here.
+  if (window.location.hash.startsWith('#/zarr')) {
+    const query = hashQuery(window.location.hash) || window.location.search;
+    window.history.replaceState(null, '', window.location.pathname + query + '#/');
+  }
+} else if (isServerless) {
   if (!window.location.hash && /\/zarr\/?$/.test(window.location.pathname)) {
     const up = window.location.pathname.endsWith('/') ? '../' : './';
     const target = new URL(up + '#/zarr' + window.location.search, window.location.href);
@@ -62,13 +71,15 @@ createRoot(document.getElementById('root')!).render(
            </div>
          </div>
       } />
-      <Route path="/zarr" element={
-         <div className="app-container">
-           <div className="main-content">
-             <FreeBrowse nv={nv} mode="zarr" />
+      {ZARR_SUPPORTED && (
+        <Route path="/zarr" element={
+           <div className="app-container">
+             <div className="main-content">
+               <FreeBrowse nv={nv} mode="zarr" />
+             </div>
            </div>
-         </div>
-      } />
+        } />
+      )}
       {qaNv && (
         <Route path="/qa" element={
           <div className="app-container">

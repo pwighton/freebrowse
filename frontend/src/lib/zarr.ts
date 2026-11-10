@@ -14,7 +14,20 @@
 import type { NiiVue, NVChunkedVolume } from "@niivue/niivue";
 import type { OmeZarrSource } from "@niivue/nv-ext-tile/zarr";
 
-const loadZarrModule = () => import("@niivue/nv-ext-tile/zarr");
+/**
+ * Whether this build includes OME-Zarr support. The single-file build is made
+ * without it (`VITE_NO_ZARR`): the env test is written inline below so the
+ * bundler drops the import, and the library with it, as dead code.
+ */
+export const ZARR_SUPPORTED = import.meta.env.VITE_NO_ZARR !== "true";
+
+const loadZarrModule =
+  import.meta.env.VITE_NO_ZARR === "true"
+    ? () =>
+        Promise.reject<typeof import("@niivue/nv-ext-tile/zarr")>(
+          new Error("OME-Zarr support is not included in this build."),
+        )
+    : () => import("@niivue/nv-ext-tile/zarr");
 
 export interface ZarrLevelInfo {
   /** Pyramid level, 0 = finest. */

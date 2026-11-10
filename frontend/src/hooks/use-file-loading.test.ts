@@ -6,6 +6,7 @@ import { useFreeBrowseStore } from "@/store";
 import { useFileLoading } from "./use-file-loading";
 
 const zarr = vi.hoisted(() => ({
+  ZARR_SUPPORTED: true,
   isZarrUrl: vi.fn(),
   probeZarr: vi.fn(),
   loadZarrLevel: vi.fn(),

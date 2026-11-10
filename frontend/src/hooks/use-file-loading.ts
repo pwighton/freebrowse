@@ -5,7 +5,12 @@ import type { FileItem } from "@/components/file-list";
 import { useCapabilities } from "@/lib/capabilities";
 import { deploymentConfig, getFreeBrowseConfig } from "@/lib/deployment-config";
 import { describeLoadError } from "@/lib/load-errors";
-import { isZarrUrl, loadZarrLevel, probeZarr } from "@/lib/zarr";
+import {
+  isZarrUrl,
+  loadZarrLevel,
+  probeZarr,
+  ZARR_SUPPORTED,
+} from "@/lib/zarr";
 
 const LEGACY_NVD_MESSAGE =
   "This .nvd predates the niivue document schema (it has `imageOptionsArray` " +
@@ -320,7 +325,8 @@ export function useFileLoading(
         return;
       }
       setUrlLoadStatus({ state: "loading", url });
-      const zarrVersion = await probeZarr(url);
+      // A build without zarr support has no use for the answer.
+      const zarrVersion = ZARR_SUPPORTED ? await probeZarr(url) : null;
       await handleImagingFileSelect(
         zarrVersion
           ? { filename, url, zarr: true, zarrVersion }
