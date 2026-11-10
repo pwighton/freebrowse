@@ -42,7 +42,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 ENV NIIVUE_BUILD_DIR=/app/frontend/dist
 ENV DATA_DIR=/app/data
 ENV SCENE_SCHEMA_ID=freebrowse
-ENV IMAGING_EXTENSIONS='["*.nii", "*.nii.gz"]'
+ENV IMAGING_EXTENSIONS='["*.nii", "*.nii.gz", "*.zarr"]'
 ENV BACKEND_HOST=0.0.0.0
 ENV BACKEND_PORT=8000
 ENV FRONTEND_PORT=5173

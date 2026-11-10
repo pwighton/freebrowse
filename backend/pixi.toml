@@ -23,7 +23,7 @@ ENABLE_AI = "true"
 ENABLE_AI_HISTORY = "true"
 AI_SESSION_CACHE_TTL_SECONDS = "1800"
 SCENE_SCHEMA_ID = "freebrowse"
-IMAGING_EXTENSIONS = '["*.nii", "*.nii.gz"]'
+IMAGING_EXTENSIONS = '["*.nii", "*.nii.gz", "*.zarr"]'
 SERVERLESS_MODE = "false"
 
 [tasks.dev-serverless]
@@ -38,7 +38,7 @@ cmd = """
 NIIVUE_BUILD_DIR = "../frontend/dist"
 DATA_DIR = "../data"
 SCENE_SCHEMA_ID = "freebrowse"
-IMAGING_EXTENSIONS = '["*.nii", "*.nii.gz"]'
+IMAGING_EXTENSIONS = '["*.nii", "*.nii.gz", "*.zarr"]'
 SERVERLESS_MODE = "true"
 
 [dependencies]

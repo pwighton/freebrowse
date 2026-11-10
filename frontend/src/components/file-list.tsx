@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Badge } from '@/components/ui/badge'
 
 export interface FileItem {
   filename: string;
@@ -66,6 +67,11 @@ export const FileList: React.FC<FileListProps> = ({
               onClick={() => onFileSelect(file)}
             >
               {file.filename}
+              {file.zarr && (
+                <Badge variant="outline" className="ml-2 align-middle">
+                  zarr
+                </Badge>
+              )}
             </li>
           ))}
         </ul>

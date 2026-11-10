@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ai_session import build_router as build_ai_router
+from data_listing import list_data_files
 
 # Configure logging.  Possible logging levels are:
 #   - logging.DEBUG
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 static_dir = os.getenv('NIIVUE_BUILD_DIR')
 data_dir = os.getenv('DATA_DIR')
 scene_schema_id = os.getenv('SCENE_SCHEMA_ID')
-imaging_extensions_str = os.getenv('IMAGING_EXTENSIONS', '["*.nii", "*.nii.gz"]')
+imaging_extensions_str = os.getenv('IMAGING_EXTENSIONS', '["*.nii", "*.nii.gz", "*.zarr"]')
 imaging_extensions = json.loads(imaging_extensions_str)
 serverless_mode = os.getenv('SERVERLESS_MODE', 'false').lower() == 'true'
 ai_dir = os.getenv('AI_DIR')
@@ -67,40 +68,23 @@ app = FastAPI()
 def list_niivue_documents():
     if serverless_mode:
         raise HTTPException(status_code=404, detail="Endpoint not available in serverless mode")
-    nvd_dir = os.path.join(data_dir)
-    logger.debug(f"Looking for niivue documents (.nvd) files recursivly in {nvd_dir}")
-    nvd_files = []
+    logger.debug(f"Looking for niivue documents (.nvd) files recursivly in {data_dir}")
     try:
-      for filepath in Path(nvd_dir).rglob('*.nvd'):
-        rel_filepath = str(filepath.relative_to(nvd_dir))
-        nvd_file = {
-            "filename": rel_filepath,
-            "url": "data/" + rel_filepath
-        }
-        nvd_files.append(nvd_file)
+        return list_data_files(data_dir, ["*.nvd"])
     except Exception as e:
         return {"error": str(e)}
-    return sorted(nvd_files, key=lambda x: x["url"])
 
 @app.get("/data/vol")
 def list_imaging_files():
     if serverless_mode:
         raise HTTPException(status_code=404, detail="Endpoint not available in serverless mode")
-    imaging_dir = os.path.join(data_dir)
-    logger.debug(f"Looking for imaging files {imaging_extensions} recursively in {imaging_dir}")
-    imaging_files = []
+    logger.debug(f"Looking for imaging files {imaging_extensions} recursively in {data_dir}")
     try:
-        for pattern in imaging_extensions:
-            for filepath in Path(imaging_dir).rglob(pattern):
-                rel_filepath = str(filepath.relative_to(imaging_dir))
-                imaging_file = {
-                    "filename": rel_filepath,
-                    "url": "data/" + rel_filepath
-                }
-                imaging_files.append(imaging_file)
+        # A zarr store (a `*.zarr` directory) is listed as one entry; the /data
+        # mount below serves the files inside it.
+        return list_data_files(data_dir, imaging_extensions)
     except Exception as e:
         return {"error": str(e)}
-    return sorted(imaging_files, key=lambda x: x["url"])
 
 @app.post("/data/nvd")
 def save_scene(request: SaveSceneRequest):

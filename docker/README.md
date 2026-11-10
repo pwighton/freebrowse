@@ -168,7 +168,7 @@ Available variables:
 - `BACKEND_PORT`: Backend port (default: `8000`) - can also be set via `--backend-port` argument
 - `FRONTEND_PORT`: Frontend port (default: `5173`) - can also be set via `--frontend-port` argument
 - `SCENE_SCHEMA_ID`: Schema ID (default: `freebrowse`)
-- `IMAGING_EXTENSIONS`: File extensions to scan (default: `["*.nii", "*.nii.gz"]`)
+- `IMAGING_EXTENSIONS`: File name patterns to list (default: `["*.nii", "*.nii.gz", "*.zarr"]`). `*.zarr` lists OME-Zarr stores, which are directories.
 
 **Note:** Command-line arguments take precedence over environment variables for port configuration.
 
