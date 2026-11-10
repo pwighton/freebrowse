@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { registerNiiVueEvents } from "@/store/niivue-sync";
 import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
@@ -9,6 +9,7 @@ import { useDrawing } from "@/hooks/use-drawing";
 import { useMagicWand } from "@/hooks/use-magic-wand";
 import { useSave } from "@/hooks/use-save";
 import { useFileLoading } from "@/hooks/use-file-loading";
+import { useZarrStream } from "@/hooks/use-zarr-stream";
 import { useAiCapabilities } from "@/hooks/use-ai-capabilities";
 import { useAiSession } from "@/hooks/use-ai-session";
 import {
@@ -16,10 +17,12 @@ import {
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
 import type { NiiVue } from "@niivue/niivue";
+import type { FreeBrowseMode } from "@/lib/capabilities";
 import { getFreeBrowseConfig } from "@/lib/deployment-config";
 import { useFreeBrowseStore } from "@/store";
 import ViewerShell from "./viewer-shell";
 import Sidebar from "./sidebar";
+import ZarrOpener from "./zarr-opener";
 import RemoveDialog from "./dialogs/remove-dialog";
 import SaveDialog from "./dialogs/save-dialog";
 import SettingsDialog from "./dialogs/settings-dialog";
@@ -55,15 +58,83 @@ export interface FreeBrowseProps {
   sidebar?: boolean;
   /** Show the footer (coordinate readout) initially. Default true. */
   footer?: boolean;
+  /**
+   * `"zarr"` mounts the streaming view: one OME-Zarr store streamed as the
+   * base volume, with the features that need voxels in memory switched off
+   * (see `lib/capabilities.ts`). Default `"default"`, the full viewer.
+   */
+  mode?: FreeBrowseMode;
 }
 
-export default function FreeBrowse({
+// The mode the instance's scene was last used in. Both modes share one NiiVue
+// instance and one store, and what one mode leaves loaded is not valid in the
+// other (a streamed base under the drawing tools, say).
+let sceneMode: FreeBrowseMode | null = null;
+
+/** Empty the scene and the store's view of it, for a change of mode. */
+async function resetScene(nv: NiiVue): Promise<void> {
+  try {
+    nv.drawIsEnabled = false;
+    if (nv.drawingVolume) nv.closeDrawing();
+    // Removing a streamed volume also stops its workers (lib/zarr.ts).
+    await nv.removeAllVolumes();
+    await nv.removeAllMeshes();
+  } catch (error) {
+    console.error("Error clearing the scene:", error);
+  }
+  // No UI is mounted to hear niivue's events, so the store is reset by hand.
+  useFreeBrowseStore.setState((state) => ({
+    currentImageIndex: null,
+    currentSurfaceIndex: null,
+    showUploader: true,
+    locationData: null,
+    zarrVolumes: {},
+    zarrStream: null,
+    urlLoadStatus: { state: "idle" },
+    activeTab: "sceneDetails",
+    drawingOptions: { ...state.drawingOptions, enabled: false, mode: "none" },
+    volumeVersion: state.volumeVersion + 1,
+  }));
+}
+
+/**
+ * The FreeBrowse UI. Renders the viewer once the scene belongs to `mode`:
+ * switching mode (the app's `/` and `/zarr` routes do) first empties the
+ * scene, then mounts the other mode's UI afresh.
+ */
+export default function FreeBrowse(props: FreeBrowseProps) {
+  const { nv } = props;
+  const mode = props.mode ?? "default";
+  const appMode = useFreeBrowseStore((s) => s.appMode);
+  const [ready, setReady] = useState(
+    () => sceneMode === null || sceneMode === mode,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (sceneMode !== null && sceneMode !== mode) await resetScene(nv);
+      sceneMode = mode;
+      useFreeBrowseStore.getState().setAppMode(mode);
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, nv]);
+
+  if (!ready || appMode !== mode) return null;
+  return <FreeBrowseView {...props} mode={mode} />;
+}
+
+function FreeBrowseView({
   nv,
   exposeGlobal,
   hostInstance = false,
   dragDrop,
   sidebar,
   footer,
+  mode = "default",
 }: FreeBrowseProps) {
   const expose = exposeGlobal ?? getFreeBrowseConfig().exposeGlobal;
 
@@ -190,6 +261,8 @@ export default function FreeBrowse({
     updateSurfaceDetails,
   );
 
+  const { openZarrStore } = useZarrStream(nvRef);
+
   useAiCapabilities();
   const {
     refreshSessions: handleAiRefreshSessions,
@@ -205,6 +278,9 @@ export default function FreeBrowse({
       nvInstance={nv}
       viewMode={viewerOptions.viewMode}
       onFileUpload={handleFileUpload}
+      nvCanvasEmptyState={
+        mode === "zarr" ? <ZarrOpener onOpen={(url) => void openZarrStore(url)} /> : undefined
+      }
       sidebar={
         <Sidebar
           nvRef={nvRef}
@@ -212,7 +288,9 @@ export default function FreeBrowse({
           onNvdFileSelect={handleNvdFileSelect}
           onImagingFileSelect={handleImagingFileSelect}
           onAddMoreFiles={handleAddMoreFiles}
-          onLoadUrl={handleUrlLoad}
+          onLoadUrl={
+            mode === "zarr" ? (url) => void openZarrStore(url) : handleUrlLoad
+          }
           onAddSurfaceFiles={handleAddSurfaceFiles}
           getVolumes={getVolumes}
           onToggleImageVisibility={toggleImageVisibility}

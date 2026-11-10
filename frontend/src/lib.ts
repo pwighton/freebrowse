@@ -12,6 +12,7 @@
  */
 export { mountFreeBrowse } from "@/mount";
 export type { MountOptions, FreeBrowseHandle } from "@/mount";
+export type { FreeBrowseMode } from "@/lib/capabilities";
 export {
   createFreeBrowseInstance,
   DEFAULT_NIIVUE_OPTIONS,

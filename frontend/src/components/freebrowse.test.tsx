@@ -156,4 +156,56 @@ describe("FreeBrowse", () => {
     });
     expect(useFreeBrowseStore.getState().viewerOptions.viewMode).toBe("render");
   });
+  // Last: these leave the shared scene in zarr mode until they switch back.
+  it("mode=\"zarr\" shows the store opener and hides what needs voxels in memory", async () => {
+    const nv = createFreeBrowseInstance();
+    const view = await act(async () => render(<FreeBrowse nv={nv} mode="zarr" />));
+    expect(screen.getByText("Stream an OME-Zarr store")).toBeInTheDocument();
+    expect(screen.queryByText("Load Medical Images")).not.toBeInTheDocument();
+    expect(screen.getByText("zarr streaming")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    for (const name of ["Load volumes", "Create empty drawing layer", "Download"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(nv.isDragDropEnabled).toBe(false);
+    view.unmount();
+    await act(async () => {
+      render(<FreeBrowse nv={nv} />).unmount();
+    });
+  });
+
+  it("switching mode empties the scene before the other view mounts", async () => {
+    const nv: Nv = createFreeBrowseInstance();
+    const view = await act(async () => render(<FreeBrowse nv={nv} />));
+    await act(async () => {
+      await nv.addVolume({ url: "https://x/brain.nii.gz", name: "brain.nii.gz" });
+      nv.createEmptyDrawing();
+    });
+    expect(screen.getByText("brain.nii.gz")).toBeInTheDocument();
+    useFreeBrowseStore.setState({
+      zarrVolumes: {
+        v: { url: "u", level: 0, levelCount: 1, spacingUm: [1, 1, 1] },
+      },
+    });
+
+    await act(async () => {
+      view.rerender(<FreeBrowse nv={nv} mode="zarr" />);
+    });
+    expect(nv.volumes).toHaveLength(0);
+    expect(nv.drawingVolume).toBeNull();
+    expect(screen.queryByText("brain.nii.gz")).not.toBeInTheDocument();
+    expect(screen.getByText("Stream an OME-Zarr store")).toBeInTheDocument();
+    const state = useFreeBrowseStore.getState();
+    expect(state.appMode).toBe("zarr");
+    expect(state.zarrVolumes).toEqual({});
+    expect(state.drawingOptions.enabled).toBe(false);
+    expect(state.currentImageIndex).toBeNull();
+
+    await act(async () => {
+      view.rerender(<FreeBrowse nv={nv} />);
+    });
+    expect(useFreeBrowseStore.getState().appMode).toBe("default");
+    expect(screen.getByText("Load Medical Images")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").length).toBeGreaterThan(1);
+  });
 });

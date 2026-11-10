@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { LabeledSliderWithInput } from "@/components/ui/labeled-slider-with-input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useCapabilities } from "@/lib/capabilities";
 import { deploymentConfig } from "@/lib/deployment-config";
 import type { ZarrVolumeOrigin } from "@/store/zarr-slice";
 import type { NiiVue, NVImage } from "@niivue/niivue";
@@ -83,6 +84,8 @@ export default function SceneDetailsTab({
   const urlLoading = useFreeBrowseStore(
     (s) => s.urlLoadStatus.state === "loading",
   );
+  const capabilities = useCapabilities();
+  const zarrMode = useFreeBrowseStore((s) => s.appMode === "zarr");
   const [urlText, setUrlText] = useState("");
 
   const submitUrl = (event: React.FormEvent) => {
@@ -152,23 +155,25 @@ export default function SceneDetailsTab({
                   )}
                 </div>
                 <div className="flex-shrink-0 flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditVolume(index);
-                    }}
-                    disabled={!canEditVolume(index)}
-                    title={
-                      canEditVolume(index)
-                        ? "Edit as drawing"
-                        : "Cannot edit - must match background dimensions and affine"
-                    }
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
+                  {capabilities.drawing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditVolume(index);
+                      }}
+                      disabled={!canEditVolume(index)}
+                      title={
+                        canEditVolume(index)
+                          ? "Edit as drawing"
+                          : "Cannot edit - must match background dimensions and affine"
+                      }
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -192,20 +197,24 @@ export default function SceneDetailsTab({
           </div>
         )}
         <div className="p-2 border-t space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={onAddMoreFiles}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Load volumes
-          </Button>
+          {capabilities.fileUpload && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={onAddMoreFiles}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Load volumes
+            </Button>
+          )}
           <form className="flex gap-2" onSubmit={submitUrl}>
             <Input
               type="text"
-              aria-label="Volume or zarr URL"
-              placeholder="Volume or OME-Zarr URL"
+              aria-label={zarrMode ? "OME-Zarr store URL" : "Volume or zarr URL"}
+              placeholder={
+                zarrMode ? "OME-Zarr store URL" : "Volume or OME-Zarr URL"
+              }
               className="h-8 text-xs"
               value={urlText}
               onChange={(e) => setUrlText(e.target.value)}
@@ -216,55 +225,59 @@ export default function SceneDetailsTab({
               variant="outline"
               size="sm"
               disabled={!urlText.trim() || urlLoading}
-              title="Load from URL"
+              title={zarrMode ? "Stream this store" : "Load from URL"}
             >
               <Link className="mr-2 h-4 w-4" />
-              {urlLoading ? "Loading" : "Load"}
+              {urlLoading ? "Loading" : zarrMode ? "Open" : "Load"}
             </Button>
           </form>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={onCreateDrawingLayer}
-            disabled={drawingOptions.enabled || volumes.length === 0}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Create empty drawing layer
-          </Button>
-          <div className="flex gap-2">
+          {capabilities.drawing && (
             <Button
               variant="outline"
               size="sm"
-              className="flex-1"
-              onClick={() => onSaveScene(false)}
-              disabled={
-                volumes.length === 0 || drawingOptions.enabled || serverlessMode
-              }
+              className="w-full"
+              onClick={onCreateDrawingLayer}
+              disabled={drawingOptions.enabled || volumes.length === 0}
             >
-              <Save className="mr-2 h-4 w-4" />
-              Save
+              <Pencil className="mr-2 h-4 w-4" />
+              Create empty drawing layer
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => onSaveScene(true)}
-              disabled={
-                volumes.length === 0 ||
-                drawingOptions.enabled ||
-                deploymentConfig.downloadDisabled
-              }
-              title={
-                deploymentConfig.downloadDisabled
-                  ? "Download is disabled in this deployment"
-                  : undefined
-              }
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
-          </div>
+          )}
+          {capabilities.save && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => onSaveScene(false)}
+                disabled={
+                  volumes.length === 0 || drawingOptions.enabled || serverlessMode
+                }
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Save
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => onSaveScene(true)}
+                disabled={
+                  volumes.length === 0 ||
+                  drawingOptions.enabled ||
+                  deploymentConfig.downloadDisabled
+                }
+                title={
+                  deploymentConfig.downloadDisabled
+                    ? "Download is disabled in this deployment"
+                    : undefined
+                }
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+            </div>
+          )}
         </div>
       </ScrollArea>
       <ScrollArea className="flex-1 min-h-0">

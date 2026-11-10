@@ -2,6 +2,7 @@ import { useFreeBrowseStore } from "@/store";
 import { FileText, Box, Brain, Database, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useCapabilities } from "@/lib/capabilities";
 import type { NiiVue, NVImage, NVMeshLayer } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 import NvdTab from "@/components/tabs/nvd-tab";
@@ -80,7 +81,10 @@ export default function Sidebar(props: SidebarProps) {
   const setActiveTab = useFreeBrowseStore((s) => s.setActiveTab);
   const drawingOptions = useFreeBrowseStore((s) => s.drawingOptions);
   const aiEnabled = useFreeBrowseStore((s) => s.aiEnabled);
-  const showAiTab = !props.serverlessMode && aiEnabled === true;
+  const capabilities = useCapabilities();
+  const showAiTab =
+    capabilities.ai && !props.serverlessMode && aiEnabled === true;
+  const showBackendTabs = capabilities.backendBrowse && !props.serverlessMode;
 
   return (
     <aside
@@ -100,22 +104,26 @@ export default function Sidebar(props: SidebarProps) {
           >
             <Box className="h-4 w-4 mr-2" />
           </TabsTrigger>
-          <TabsTrigger
-            value="surfaceDetails"
-            className="data-[state=active]:bg-muted"
-          >
-            <Brain className="h-4 w-4 mr-2" />
-          </TabsTrigger>
-          <TabsTrigger
-            value="drawing"
-            className={cn(
-              "data-[state=active]:bg-muted",
-              !drawingOptions.enabled && "text-muted-foreground",
-            )}
-            disabled={!drawingOptions.enabled}
-          >
-            <Pencil className="h-4 w-4 mr-2" />
-          </TabsTrigger>
+          {capabilities.surfaces && (
+            <TabsTrigger
+              value="surfaceDetails"
+              className="data-[state=active]:bg-muted"
+            >
+              <Brain className="h-4 w-4 mr-2" />
+            </TabsTrigger>
+          )}
+          {capabilities.drawing && (
+            <TabsTrigger
+              value="drawing"
+              className={cn(
+                "data-[state=active]:bg-muted",
+                !drawingOptions.enabled && "text-muted-foreground",
+              )}
+              disabled={!drawingOptions.enabled}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+            </TabsTrigger>
+          )}
           {showAiTab && (
             <TabsTrigger
               value="aiAnnotation"
@@ -124,12 +132,12 @@ export default function Sidebar(props: SidebarProps) {
               <Sparkles className="h-4 w-4 mr-2" />
             </TabsTrigger>
           )}
-          {!props.serverlessMode && (
+          {showBackendTabs && (
             <TabsTrigger value="nvds" className="data-[state=active]:bg-muted">
               <FileText className="h-4 w-4 mr-2" />
             </TabsTrigger>
           )}
-          {!props.serverlessMode && (
+          {showBackendTabs && (
             <TabsTrigger value="data" className="data-[state=active]:bg-muted">
               <Database className="h-4 w-4 mr-2" />
             </TabsTrigger>
@@ -220,13 +228,13 @@ export default function Sidebar(props: SidebarProps) {
         )}
 
         <TabsContent value="nvds" className="flex-1 min-h-0 p-0">
-          {!props.serverlessMode && (
+          {showBackendTabs && (
             <NvdTab onFileSelect={props.onNvdFileSelect} />
           )}
         </TabsContent>
 
         <TabsContent value="data" className="flex-1 min-h-0 p-0">
-          {!props.serverlessMode && (
+          {showBackendTabs && (
             <DataTab onFileSelect={props.onImagingFileSelect} />
           )}
         </TabsContent>

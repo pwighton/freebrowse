@@ -6,6 +6,7 @@ import {
   isZarrUrl,
   loadZarrLevel,
   probeZarr,
+  streamZarr,
   resolveZarrUrl,
 } from "./zarr";
 
@@ -28,6 +29,7 @@ const zarrModule = vi.hoisted(() => ({
   omeZarrChannelName: vi.fn(),
   defaultOmeZarrLevel: vi.fn(),
   omeZarrVolumesFrom: vi.fn(),
+  streamOmeZarr: vi.fn(),
 }));
 vi.mock("@niivue/nv-ext-tile/zarr", () => zarrModule);
 
@@ -262,5 +264,71 @@ describe("loadZarrLevel", () => {
       "unsupported dtype",
     );
     expect(nv.volumes).toHaveLength(0);
+  });
+});
+
+describe("streamZarr", () => {
+  const handle = { setFocus: vi.fn() };
+
+  beforeEach(() => {
+    zarrModule.streamOmeZarr
+      .mockReset()
+      .mockImplementation(
+        async (nv: NiiVue, _url: string, _o: unknown, v: { name: string }) => {
+          await nv.addVolume({ url: "streamed://1", name: v.name });
+          return handle;
+        },
+      );
+  });
+
+  test("streams the first channel, replacing the scene, named after the store", async () => {
+    const nv = new NiiVue();
+    await nv.addVolume({ url: "orig.nii.gz" });
+    const stream = await streamZarr(asNv(nv), "https://host/a.zarr/");
+    expect(zarrModule.streamOmeZarr).toHaveBeenCalledWith(
+      nv,
+      "https://host/a.zarr",
+      { channel: 0, timepoint: undefined, replace: true },
+      { name: "sample DAPI" },
+    );
+    expect(stream.volume).toBe(handle);
+    expect(stream.channel).toBe(0);
+    expect(stream.volumeId).toBe(nv.volumes.at(-1)?.id);
+    expect(stream.description.channels).toEqual(["DAPI", "GFP"]);
+  });
+
+  test.each([
+    ["0.4", 2],
+    ["0.5", 3],
+    ["0.1", 2],
+  ])("NGFF %s tells the stream's own open it is zarr v%i", async (ngff, version) => {
+    zarrModule.fetchOmeZarr.mockResolvedValue({
+      ...source,
+      info: { name: "sample", version: ngff },
+    });
+    const nv = new NiiVue();
+    await streamZarr(asNv(nv), "https://host/a.zarr");
+    expect(zarrModule.streamOmeZarr.mock.calls[0][2]).toMatchObject({
+      zarrVersion: version,
+    });
+  });
+
+  test("channel, colormap, version and replace are passed through", async () => {
+    const nv = new NiiVue();
+    await streamZarr(asNv(nv), "https://host/a.zarr", {
+      channel: 1,
+      colormap: "Hot",
+      zarrVersion: 2,
+      replace: false,
+    });
+    expect(zarrModule.fetchOmeZarr).toHaveBeenCalledWith("https://host/a.zarr", {
+      zarrVersion: 2,
+    });
+    expect(zarrModule.streamOmeZarr).toHaveBeenCalledWith(
+      nv,
+      "https://host/a.zarr",
+      { channel: 1, timepoint: undefined, replace: false, zarrVersion: 2 },
+      { name: "sample GFP", colormap: "Hot" },
+    );
   });
 });

@@ -30,6 +30,7 @@ export default function Header({ nvRef }: HeaderProps) {
   const setSettingsDialogOpen = useFreeBrowseStore(
     (s) => s.setSettingsDialogOpen,
   );
+  const zarrMode = useFreeBrowseStore((s) => s.appMode === "zarr");
 
   const {
     viewerOptions,
@@ -50,6 +51,11 @@ export default function Header({ nvRef }: HeaderProps) {
           >
             FreeBrowse {__APP_VERSION__}
           </a>
+          {zarrMode && (
+            <span className="ml-3 rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              zarr streaming
+            </span>
+          )}
         </h1>
         <div className="bg-background p-2">
           <div className="flex items-center justify-between flex-wrap gap-4">

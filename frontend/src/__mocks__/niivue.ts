@@ -259,6 +259,14 @@ export class NiiVue extends EventTarget {
     this.emit("meshLoaded", { mesh });
   }
 
+  async removeAllVolumes(): Promise<void> {
+    while (this.volumes.length > 0) this.removeVolume(this.volumes.length - 1);
+  }
+
+  async removeAllMeshes(): Promise<void> {
+    while (this.meshes.length > 0) this.removeMesh(this.meshes.length - 1);
+  }
+
   removeMesh(index: number): void {
     // Emit BEFORE removal, matching real niivue-mono.
     const mesh = this.meshes[index];

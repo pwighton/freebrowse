@@ -1,14 +1,17 @@
 /**
  * OME-Zarr loading for FreeBrowse, on top of `@niivue/nv-ext-tile/zarr`.
  *
- * This module covers the whole-level path: one pyramid level is read fully
- * into memory and added as an ordinary volume, so everything that works on a
- * NIfTI (drawing, save, voxel readout) works on it. Streaming is separate.
+ * Two ways in. The whole-level path ({@link loadZarrLevel}) reads one pyramid
+ * level fully into memory and adds it as an ordinary volume, so everything
+ * that works on a NIfTI (drawing, save, voxel readout) works on it. The
+ * streaming path ({@link streamZarr}) fetches bricks around the crosshair at
+ * several resolutions, for stores far larger than memory; a streamed volume
+ * has no voxels on the CPU, so those features do not apply to it.
  *
  * The niivue extension is imported lazily so zarrita stays out of the main
  * bundle until a store is actually opened.
  */
-import type { NiiVue } from "@niivue/niivue";
+import type { NiiVue, NVChunkedVolume } from "@niivue/niivue";
 import type { OmeZarrSource } from "@niivue/nv-ext-tile/zarr";
 
 const loadZarrModule = () => import("@niivue/nv-ext-tile/zarr");
@@ -158,6 +161,16 @@ function storeLabel(url: string, source: OmeZarrSource): string {
   return segment ? decodeURIComponent(segment) : "";
 }
 
+/**
+ * The zarr format an opened store is in, from its OME-NGFF version: 0.5 is
+ * defined on zarr v3, 0.4 and earlier on v2. Undefined when unstated.
+ */
+function zarrVersionOf(source: OmeZarrSource): 2 | 3 | undefined {
+  const ngff = parseFloat(source.info.version ?? "");
+  if (Number.isNaN(ngff)) return undefined;
+  return ngff >= 0.5 ? 3 : 2;
+}
+
 /** Layer name for one channel: the store's label, plus the channel if several. */
 function volumeName(
   label: string,
@@ -241,4 +254,67 @@ export async function loadZarrLevel(
     .filter((id): id is string => !!id && !before.has(id));
 
   return { description, level, volumeIds };
+}
+
+export interface StreamZarrOptions {
+  /** Channel to stream. Default: the first. */
+  channel?: number;
+  timepoint?: number;
+  /**
+   * Remove the volumes shown once the store has opened, so a store that fails
+   * to open leaves the scene as it was. Default true: a streamed volume has to
+   * be the base layer.
+   */
+  replace?: boolean;
+  /** The store's format when already known (see {@link probeZarr}). */
+  zarrVersion?: 2 | 3;
+  colormap?: string;
+}
+
+export interface StreamedZarr {
+  description: ZarrDescription;
+  /** niivue's handle on the stream (focus, detail, budget). */
+  volume: NVChunkedVolume;
+  /** Id of the streamed volume in `nv.volumes`. */
+  volumeId: string;
+  channel: number;
+}
+
+/**
+ * Stream a store into the scene. The stream's workers stop by themselves
+ * once the volume is removed or the viewer destroyed.
+ */
+export async function streamZarr(
+  nv: NiiVue,
+  url: string,
+  options: StreamZarrOptions = {},
+): Promise<StreamedZarr> {
+  const { zarr, source, description } = await openZarr(
+    url,
+    undefined,
+    options.zarrVersion,
+  );
+  // niivue opens the store again for the stream. Tell it the format the first
+  // open found, so it does not repeat the v3-then-v2 probe.
+  const zarrVersion = options.zarrVersion ?? zarrVersionOf(source);
+  const channel = options.channel ?? 0;
+  const name = volumeName(
+    storeLabel(description.url, source),
+    description.channels,
+    channel,
+  );
+  const before = new Set(nv.volumes.map((v) => v.id));
+  const volume = await zarr.streamOmeZarr(
+    nv,
+    description.url,
+    {
+      channel,
+      timepoint: options.timepoint,
+      replace: options.replace ?? true,
+      ...(zarrVersion ? { zarrVersion } : {}),
+    },
+    { name, ...(options.colormap ? { colormap: options.colormap } : {}) },
+  );
+  const added = nv.volumes.find((v) => v.id && !before.has(v.id));
+  return { description, volume, volumeId: added?.id ?? "", channel };
 }

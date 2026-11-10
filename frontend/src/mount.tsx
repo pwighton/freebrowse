@@ -6,6 +6,7 @@ import {
   configureFreeBrowse,
   type FreeBrowseBackend,
 } from "@/lib/deployment-config";
+import type { FreeBrowseMode } from "@/lib/capabilities";
 import { useFreeBrowseStore } from "@/store";
 
 export interface MountOptions {
@@ -39,6 +40,11 @@ export interface MountOptions {
   sidebar?: boolean;
   /** Show the footer (coordinate readout) initially. Default true. */
   footer?: boolean;
+  /**
+   * `"zarr"` mounts the OME-Zarr streaming view in place of the full viewer.
+   * Default `"default"`.
+   */
+  mode?: FreeBrowseMode;
 }
 
 export interface FreeBrowseHandle {
@@ -98,6 +104,7 @@ export function mountFreeBrowse(
       dragDrop={options.dragDrop}
       sidebar={options.sidebar}
       footer={options.footer}
+      mode={options.mode}
     />,
   );
 

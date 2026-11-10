@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>FreeBrowse zarr viewer</title>
+    <script>
+      // The zarr streaming view is a route of the single-page app. This stub
+      // gives it a plain address: <base>/zarr/?zarr=<store> forwards to
+      // <base>/#/zarr?zarr=<store>.
+      location.replace("../#/zarr" + location.search);
+    </script>
+  </head>
+  <body>
+    <noscript>FreeBrowse needs JavaScript.</noscript>
+  </body>
+</html>

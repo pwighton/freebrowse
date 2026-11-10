@@ -6,6 +6,7 @@
  */
 export { default as FreeBrowse } from "@/components/freebrowse";
 export type { FreeBrowseProps } from "@/components/freebrowse";
+export type { FreeBrowseMode } from "@/lib/capabilities";
 export {
   configureFreeBrowse,
   getFreeBrowseConfig,

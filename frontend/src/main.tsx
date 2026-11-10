@@ -26,6 +26,26 @@ const basename = import.meta.env.BASE_URL;
 const isServerless = deploymentConfig.serverless;
 const Router = isServerless ? HashRouter : BrowserRouter;
 
+// The zarr streaming view has two addresses. A serverless build routes by
+// hash, `<base>/#/zarr`; with a backend the route is the path `<base>/zarr`.
+// `<base>/zarr/` is also a static stub (public/zarr/index.html) forwarding to
+// the hash form, so the plain address works on a static host. Settle on the
+// form this build routes by before the router reads the address. (A dev
+// server answers `/zarr/` with the app itself, not the stub, hence the first
+// case.)
+const hashQuery = (hash: string) =>
+  hash.includes('?') ? hash.slice(hash.indexOf('?')) : '';
+if (isServerless) {
+  if (!window.location.hash && /\/zarr\/?$/.test(window.location.pathname)) {
+    const up = window.location.pathname.endsWith('/') ? '../' : './';
+    const target = new URL(up + '#/zarr' + window.location.search, window.location.href);
+    window.history.replaceState(null, '', target.pathname + target.hash);
+  }
+} else if (window.location.hash.startsWith('#/zarr')) {
+  const query = hashQuery(window.location.hash) || window.location.search;
+  window.history.replaceState(null, '', basename.replace(/\/$/, '') + '/zarr' + query);
+}
+
 // The app owns its NiiVue instances (a library host would pass its own).
 const nv = createFreeBrowseInstance();
 const qaNv = isServerless ? null : createFreeBrowseInstance(QA_VIEWER_NIIVUE_OPTIONS);
@@ -39,6 +59,13 @@ createRoot(document.getElementById('root')!).render(
          <div className="app-container">
            <div className="main-content">
              <FreeBrowse nv={nv} />
+           </div>
+         </div>
+      } />
+      <Route path="/zarr" element={
+         <div className="app-container">
+           <div className="main-content">
+             <FreeBrowse nv={nv} mode="zarr" />
            </div>
          </div>
       } />

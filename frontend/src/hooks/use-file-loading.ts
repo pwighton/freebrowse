@@ -2,20 +2,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
 import type { NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
+import { useCapabilities } from "@/lib/capabilities";
 import { deploymentConfig, getFreeBrowseConfig } from "@/lib/deployment-config";
+import { describeLoadError } from "@/lib/load-errors";
 import { isZarrUrl, loadZarrLevel, probeZarr } from "@/lib/zarr";
-
-/** A load failure as one line the UI can show. */
-function describeLoadError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  // fetch() reports an unreachable host and a CORS refusal the same way.
-  if (error instanceof TypeError && /fetch/i.test(message))
-    return "Could not reach the URL (network error, or the server does not allow cross-origin requests).";
-  // zarrita: neither v3 nor v2 metadata at the URL.
-  if (error instanceof Error && error.name === "NotFoundError")
-    return "No OME-Zarr store found at this URL.";
-  return message || "Unknown error";
-}
 
 const LEGACY_NVD_MESSAGE =
   "This .nvd predates the niivue document schema (it has `imageOptionsArray` " +
@@ -470,15 +460,17 @@ export function useFileLoading(
   // niivue's own canvas drag-and-drop: only while the drop zone is up and
   // nothing is loaded, and never when the host switched drag-and-drop off.
   const dragDropEnabled = useFreeBrowseStore((s) => s.dragDropEnabled);
+  const fileUpload = useCapabilities().fileUpload;
   useEffect(() => {
     void volumeVersion;
     if (nvRef.current) {
       nvRef.current.isDragDropEnabled =
+        fileUpload &&
         dragDropEnabled &&
         showUploader &&
         (nvRef.current.volumes?.length ?? 0) === 0;
     }
-  }, [nvRef, volumeVersion, showUploader, dragDropEnabled]);
+  }, [nvRef, volumeVersion, showUploader, dragDropEnabled, fileUpload]);
 
   // If in serverless mode, switch to sceneDetails tab by default
   useEffect(() => {
@@ -491,6 +483,8 @@ export function useFileLoading(
   // keeps its own query string, see config.readUrlParams).
   useEffect(() => {
     if (!getFreeBrowseConfig().readUrlParams) return;
+    // The zarr view reads its own parameter (use-zarr-stream).
+    if (useFreeBrowseStore.getState().appMode !== "default") return;
     const urlParams = new URLSearchParams(window.location.search);
     const nvdParam = urlParams.get("nvd");
 
@@ -512,6 +506,8 @@ export function useFileLoading(
   // apply to the volume written just before them.
   useEffect(() => {
     if (!getFreeBrowseConfig().readUrlParams) return;
+    // The zarr view reads its own parameter (use-zarr-stream).
+    if (useFreeBrowseStore.getState().appMode !== "default") return;
     const urlParams = new URLSearchParams(window.location.search);
     const items: FileItem[] = [];
     // A `filename=` / `cmap=` written before any volume goes to the first.
