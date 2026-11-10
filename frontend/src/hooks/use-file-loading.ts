@@ -3,6 +3,19 @@ import { useFreeBrowseStore } from "@/store";
 import type { NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
 import { deploymentConfig, getFreeBrowseConfig } from "@/lib/deployment-config";
+import { isZarrUrl, loadZarrLevel, probeZarr } from "@/lib/zarr";
+
+/** A load failure as one line the UI can show. */
+function describeLoadError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  // fetch() reports an unreachable host and a CORS refusal the same way.
+  if (error instanceof TypeError && /fetch/i.test(message))
+    return "Could not reach the URL (network error, or the server does not allow cross-origin requests).";
+  // zarrita: neither v3 nor v2 metadata at the URL.
+  if (error instanceof Error && error.name === "NotFoundError")
+    return "No OME-Zarr store found at this URL.";
+  return message || "Unknown error";
+}
 
 const LEGACY_NVD_MESSAGE =
   "This .nvd predates the niivue document schema (it has `imageOptionsArray` " +
@@ -72,6 +85,8 @@ export function useFileLoading(
     (s) => s.setCurrentSurfaceIndex,
   );
   const setActiveTab = useFreeBrowseStore((s) => s.setActiveTab);
+  const addZarrVolumes = useFreeBrowseStore((s) => s.addZarrVolumes);
+  const setUrlLoadStatus = useFreeBrowseStore((s) => s.setUrlLoadStatus);
 
   const serverlessMode = deploymentConfig.serverless;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +223,7 @@ export function useFileLoading(
       if (!nvRef.current) return;
       const nv = nvRef.current;
 
+      setUrlLoadStatus({ state: "loading", url: file.url });
       try {
         if (showUploader) {
           setShowUploader(false);
@@ -226,14 +242,31 @@ export function useFileLoading(
           throw new Error("Canvas failed to initialize after 2 seconds");
         }
 
-        const basename = file.filename.split("/").pop() || file.filename;
-        const volume = {
-          url: file.url,
-          name: basename,
-        };
+        if (file.zarr || isZarrUrl(file.url)) {
+          // One whole pyramid level, read into memory: from here on it is an
+          // ordinary volume. niivue picks readers by file extension and would
+          // hand a store's directory URL to the NIfTI reader.
+          console.log("Adding zarr store to scene:", file.url);
+          const loaded = await loadZarrLevel(nv, file.url, {
+            zarrVersion: file.zarrVersion,
+          });
+          const { description, level } = loaded;
+          addZarrVolumes(loaded.volumeIds, {
+            url: description.url,
+            level,
+            levelCount: description.levels.length,
+            spacingUm: description.levels[level].spacingUm,
+          });
+        } else {
+          const basename = file.filename.split("/").pop() || file.filename;
+          const volume = {
+            url: file.url,
+            name: basename,
+          };
 
-        console.log("Adding imaging file to scene:", volume);
-        await nv.addVolume(volume);
+          console.log("Adding imaging file to scene:", volume);
+          await nv.addVolume(volume);
+        }
 
         applyViewerOptions();
         incrementVolumeVersion();
@@ -243,8 +276,16 @@ export function useFileLoading(
         }
 
         console.log("Imaging file loaded successfully");
+        setUrlLoadStatus({ state: "idle" });
       } catch (error) {
         console.error("Error loading imaging file:", error);
+        setUrlLoadStatus({
+          state: "error",
+          url: file.url,
+          message: describeLoadError(error),
+        });
+        // Nothing to look at: bring the drop zone back.
+        if (nv.volumes.length === 0) setShowUploader(true);
       }
     },
     [
@@ -254,7 +295,33 @@ export function useFileLoading(
       incrementVolumeVersion,
       setShowUploader,
       setCurrentImageIndex,
+      addZarrVolumes,
+      setUrlLoadStatus,
     ],
+  );
+
+  // Load a volume from a URL the user typed. A zarr store is recognised by
+  // its path, else by asking the server (stores served by id, like DANDI's,
+  // have no `.zarr` in their URL); anything else goes to niivue's readers.
+  const handleUrlLoad = useCallback(
+    async (rawUrl: string) => {
+      const url = rawUrl.trim();
+      if (!url) return;
+      const filename =
+        url.split(/[?#]/)[0].replace(/\/+$/, "").split("/").pop() || url;
+      if (isZarrUrl(url)) {
+        await handleImagingFileSelect({ filename, url, zarr: true });
+        return;
+      }
+      setUrlLoadStatus({ state: "loading", url });
+      const zarrVersion = await probeZarr(url);
+      await handleImagingFileSelect(
+        zarrVersion
+          ? { filename, url, zarr: true, zarrVersion }
+          : { filename, url },
+      );
+    },
+    [handleImagingFileSelect, setUrlLoadStatus],
   );
 
   const handleNvdFileSelect = useCallback(
@@ -435,6 +502,21 @@ export function useFileLoading(
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load an OME-Zarr store from URL parameter on initial load (app only, as
+  // above). `?vol=` also takes a store whose URL has a `.zarr` segment;
+  // `?zarr=` is for stores whose URL has none.
+  useEffect(() => {
+    if (!getFreeBrowseConfig().readUrlParams) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const zarrParam = urlParams.get("zarr");
+
+    if (zarrParam) {
+      console.log("Loading zarr store from URL parameter:", zarrParam);
+      const filename = urlParams.get("filename") || zarrParam;
+      handleImagingFileSelect({ filename, url: zarrParam, zarr: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load embedded NVD data (for self-contained HTML files)
   useEffect(() => {
     const handleEmbeddedNvd = async (event: CustomEvent) => {
@@ -484,6 +566,7 @@ export function useFileLoading(
     loadNvdData,
     handleFileUpload,
     handleImagingFileSelect,
+    handleUrlLoad,
     handleNvdFileSelect,
     handleFileChange,
     handleAddMoreFiles,

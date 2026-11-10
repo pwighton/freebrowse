@@ -10,6 +10,10 @@ import packageJson from "./package.json";
 // Both keep `@niivue/niivue` external (peer dependency) and emit the scoped
 // stylesheet as dist/style.css. `@niivue/nv-ext-drawing` is bundled: it builds
 // its worker from an inlined Blob, so nothing needs resolving at the host.
+// `@niivue/nv-ext-tile` (OME-Zarr) stays external too: it is a dependency, only
+// reached through a dynamic import, and with `inlineDynamicImports` bundling it
+// would add its ~3 MB of codecs to both entries. The host's bundler resolves it
+// and keeps it lazy.
 const entry = process.env.FREEBROWSE_LIB_ENTRY === "react" ? "react" : "index";
 const reactExternal = (id: string): boolean =>
   /^react($|\/)|^react-dom($|\/)/.test(id);
@@ -38,6 +42,7 @@ export default defineConfig({
       external: (id) =>
         id === "@niivue/niivue" ||
         id.startsWith("@niivue/niivue/") ||
+        id.startsWith("@niivue/nv-ext-tile/") ||
         (entry === "react" && reactExternal(id)),
       output: { inlineDynamicImports: true },
     },

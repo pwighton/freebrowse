@@ -146,7 +146,10 @@ describe("probeZarr", () => {
 describe("describeZarr", () => {
   test("summarises levels, channels and the default level", async () => {
     const d = await describeZarr("https://host/a.zarr/");
-    expect(zarrModule.fetchOmeZarr).toHaveBeenCalledWith("https://host/a.zarr");
+    expect(zarrModule.fetchOmeZarr).toHaveBeenCalledWith(
+      "https://host/a.zarr",
+      undefined,
+    );
     expect(d.url).toBe("https://host/a.zarr");
     expect(d.name).toBe("sample");
     expect(d.channels).toEqual(["DAPI", "GFP"]);
@@ -187,7 +190,11 @@ describe("loadZarrLevel", () => {
       level: 1,
     });
     expect(loadVolumes).not.toHaveBeenCalled();
-    expect(nv.volumes.map((v) => v.name)).toEqual(["orig.nii.gz", "DAPI", "GFP"]);
+    expect(nv.volumes.map((v) => v.name)).toEqual([
+      "orig.nii.gz",
+      "sample DAPI",
+      "sample GFP",
+    ]);
     expect(loaded.level).toBe(1);
     expect(loaded.volumeIds).toEqual([nv.volumes[1].id, nv.volumes[2].id]);
   });
@@ -202,9 +209,33 @@ describe("loadZarrLevel", () => {
       level: 2,
       channels: [1],
     });
-    expect(nv.volumes.map((v) => v.name)).toEqual(["GFP"]);
+    expect(nv.volumes.map((v) => v.name)).toEqual(["sample GFP"]);
     expect(loaded.level).toBe(2);
     expect(loaded.volumeIds).toHaveLength(1);
+  });
+
+  test("names fall back to the .zarr segment, then to the channel alone", async () => {
+    zarrModule.fetchOmeZarr.mockResolvedValue({
+      ...source,
+      info: { name: null },
+      channelCount: 1,
+    });
+    zarrModule.omeZarrVolumesFrom.mockResolvedValue([{ url: "f", name: "x" }]);
+    const nv = new NiiVue();
+    await loadZarrLevel(asNv(nv), "https://host/data/brain.ome.zarr/0");
+    await loadZarrLevel(asNv(nv), "https://host/zarr/1234/");
+    expect(nv.volumes.map((v) => v.name)).toEqual(["brain.ome.zarr", "DAPI"]);
+  });
+
+  test("a known zarr version is passed to the open, not to the read", async () => {
+    const nv = new NiiVue();
+    await loadZarrLevel(asNv(nv), "https://host/a.zarr", { zarrVersion: 2 });
+    expect(zarrModule.fetchOmeZarr).toHaveBeenCalledWith("https://host/a.zarr", {
+      zarrVersion: 2,
+    });
+    expect(zarrModule.omeZarrVolumesFrom).toHaveBeenCalledWith(source, {
+      level: 1,
+    });
   });
 
   test("a failed read adds nothing", async () => {

@@ -40,12 +40,24 @@ export function useSave(nvRef: React.RefObject<NiiVue | null>) {
         if (!ok) return;
       }
 
+      const { zarrVolumes } = useFreeBrowseStore.getState();
       const volumeStates = nvRef.current.volumes.map((volume) => {
-        const isExternal = !!(volume.url && volume.url.startsWith("http"));
+        // A volume read from a zarr store lives at its store, like any other
+        // remote volume: left unchecked, so it is not re-exported as NIfTI
+        // unless asked. Its `url` is the in-memory File niivue was handed.
+        const zarr = volume.id ? zarrVolumes[volume.id] : undefined;
+        const isExternal =
+          !!zarr ||
+          (typeof volume.url === "string" && volume.url.startsWith("http"));
         return {
           enabled: !isExternal,
           isExternal,
-          url: isDownload ? volume.name || "" : volume.url || "",
+          url: isDownload
+            ? volume.name || ""
+            : typeof volume.url === "string"
+              ? volume.url
+              : "",
+          ...(zarr ? { zarrLevel: zarr.level } : {}),
         };
       });
 

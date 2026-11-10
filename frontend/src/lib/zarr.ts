@@ -47,6 +47,8 @@ export interface LoadZarrLevelOptions {
   timepoint?: number;
   /** Per-channel budget for the automatic level pick. Default 256 MiB. */
   levelBudgetBytes?: number;
+  /** The store's format when already known (see {@link probeZarr}). */
+  zarrVersion?: 2 | 3;
 }
 
 export interface LoadedZarrLevel {
@@ -142,10 +144,40 @@ function describe(
   };
 }
 
-async function openZarr(url: string, levelBudgetBytes?: number) {
+/**
+ * A short name for the store: its stated name, else the `.zarr` segment of
+ * its URL, else "" (a store served by id, like DANDI's, has neither).
+ */
+function storeLabel(url: string, source: OmeZarrSource): string {
+  if (source.info.name) return source.info.name;
+  const segment = pathOf(url)
+    .split("/")
+    .find((s) => /\.zarr$/i.test(s));
+  return segment ? decodeURIComponent(segment) : "";
+}
+
+/** Layer name for one channel: the store's label, plus the channel if several. */
+function volumeName(
+  label: string,
+  channels: string[],
+  channel: number,
+): string {
+  if (channels.length <= 1) return label || channels[0] || "zarr";
+  return label ? `${label} ${channels[channel]}` : channels[channel];
+}
+
+async function openZarr(
+  url: string,
+  levelBudgetBytes?: number,
+  zarrVersion?: 2 | 3,
+) {
   const zarr = await loadZarrModule();
   const resolved = resolveZarrUrl(url);
-  const source = await zarr.fetchOmeZarr(resolved);
+  // A known version skips zarrita's v3-then-v2 probe (a 404 on every v2 store).
+  const source = await zarr.fetchOmeZarr(
+    resolved,
+    zarrVersion ? { zarrVersion } : undefined,
+  );
   const channels = Array.from({ length: source.channelCount }, (_, c) =>
     zarr.omeZarrChannelName(source, c),
   );
@@ -164,8 +196,9 @@ async function openZarr(url: string, levelBudgetBytes?: number) {
 export async function describeZarr(
   url: string,
   levelBudgetBytes?: number,
+  zarrVersion?: 2 | 3,
 ): Promise<ZarrDescription> {
-  return (await openZarr(url, levelBudgetBytes)).description;
+  return (await openZarr(url, levelBudgetBytes, zarrVersion)).description;
 }
 
 /**
@@ -178,16 +211,27 @@ export async function loadZarrLevel(
   url: string,
   options: LoadZarrLevelOptions = {},
 ): Promise<LoadedZarrLevel> {
+  const { zarrVersion, ...readOptions } = options;
   const { zarr, source, description } = await openZarr(
     url,
     options.levelBudgetBytes,
+    zarrVersion,
   );
   const level = options.level ?? description.defaultLevel;
-  const volumes = await zarr.omeZarrVolumesFrom(source, { ...options, level });
+  const volumes = await zarr.omeZarrVolumesFrom(source, {
+    ...readOptions,
+    level,
+  });
 
+  const label = storeLabel(description.url, source);
+  const channels =
+    options.channels ?? description.channels.map((_, index) => index);
   const before = new Set(nv.volumes.map((v) => v.id));
-  for (const volume of volumes) {
-    await nv.addVolume(volume);
+  for (const [i, volume] of volumes.entries()) {
+    await nv.addVolume({
+      ...volume,
+      name: volumeName(label, description.channels, channels[i]),
+    });
   }
   const volumeIds = nv.volumes
     .map((v) => v.id)

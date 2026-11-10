@@ -3,6 +3,13 @@ import React, { useEffect, useState } from 'react'
 export interface FileItem {
   filename: string;
   url: string;
+  /**
+   * Load `url` as an OME-Zarr store. Unset, a store is still recognised by a
+   * `.zarr` path segment; set it for stores whose URL has none.
+   */
+  zarr?: boolean;
+  /** The store's zarr format, when a probe already found it. */
+  zarrVersion?: 2 | 3;
 }
 
 interface FileListProps {

@@ -124,3 +124,34 @@ describe("useSave — serializeDocument options", () => {
     });
   });
 });
+
+describe("useSave — opening the dialog", () => {
+  beforeEach(() => {
+    useFreeBrowseStore.setState({ zarrVolumes: {} });
+  });
+
+  test("a zarr-origin volume starts unchecked and carries its level", async () => {
+    const nv = nvWithVolume();
+    nv.volumes.push({ id: "vol-1", name: "stain", url: new File([], "stain.nii") as unknown as string });
+    nv.volumes.push({ id: "vol-2", name: "remote", url: "https://host/r.nii.gz" });
+    useFreeBrowseStore.setState({
+      zarrVolumes: {
+        "vol-1": {
+          url: "https://host/a.zarr",
+          level: 3,
+          levelCount: 7,
+          spacingUm: [1, 1, 1],
+        },
+      },
+    });
+    const { result } = renderHook(() => useSave(refOf(nv)));
+    await act(async () => {
+      await result.current.handleSaveScene(true);
+    });
+    expect(useFreeBrowseStore.getState().saveState.volumes).toEqual([
+      { enabled: true, isExternal: false, url: "brain.nii.gz" },
+      { enabled: false, isExternal: true, url: "stain", zarrLevel: 3 },
+      { enabled: false, isExternal: true, url: "remote" },
+    ]);
+  });
+});

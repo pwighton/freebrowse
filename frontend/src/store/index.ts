@@ -8,6 +8,7 @@ import { createViewerSlice, type ViewerSlice } from "./viewer-slice";
 import { createSaveSlice, type SaveSlice } from "./save-slice";
 import { createLocationSlice, type LocationSlice } from "./location-slice";
 import { createAiSlice, type AiSlice } from "./ai-slice";
+import { createZarrSlice, type ZarrSlice } from "./zarr-slice";
 
 export type FreeBrowseStore = VolumeSlice &
   SurfaceSlice &
@@ -15,7 +16,8 @@ export type FreeBrowseStore = VolumeSlice &
   ViewerSlice &
   SaveSlice &
   LocationSlice &
-  AiSlice;
+  AiSlice &
+  ZarrSlice;
 
 /**
  * Persistence target resolved on every call, not at store creation: the key is
@@ -71,6 +73,7 @@ export const useFreeBrowseStore = create<FreeBrowseStore>()(
       ...createSaveSlice(...a),
       ...createLocationSlice(...a),
       ...createAiSlice(...a),
+      ...createZarrSlice(...a),
     }),
     {
       name: "freebrowse-user-settings", // label only; the key comes from config
@@ -79,7 +82,7 @@ export const useFreeBrowseStore = create<FreeBrowseStore>()(
       version: 1, // bump + add migrate() on future schema changes
       // Persist ONLY user preferences. Everything else — niivue viewerOptions,
       // loaded volumes/surfaces, dialog-open flags, crosshair location, AI
-      // sessions, save state, version counters — is intentionally excluded so
+      // sessions, save state, zarr origins, version counters — is intentionally excluded so
       // that e.g. a loaded document cannot hijack the user's defaults.
       partialize: (state) => ({
         skipRemoveConfirmation: state.skipRemoveConfirmation,

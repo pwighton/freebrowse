@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useFreeBrowseStore } from "@/store";
 import {
   ImageIcon,
+  Link,
   Upload,
   Trash2,
   Eye,
@@ -14,11 +16,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LabeledSliderWithInput } from "@/components/ui/labeled-slider-with-input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { deploymentConfig } from "@/lib/deployment-config";
+import type { ZarrVolumeOrigin } from "@/store/zarr-slice";
 import type { NiiVue, NVImage } from "@niivue/niivue";
 
 interface SceneDetailsTabProps {
@@ -30,6 +34,7 @@ interface SceneDetailsTabProps {
   canEditVolume: (index: number) => boolean;
   onRemoveVolume: (index: number) => void;
   onAddMoreFiles: () => void;
+  onLoadUrl: (url: string) => void;
   onCreateDrawingLayer: () => void;
   onSaveScene: (isDownload: boolean) => void;
   onOpacityChange: (value: number) => void;
@@ -41,6 +46,14 @@ interface SceneDetailsTabProps {
   onMoveVolumeDown: () => void;
 }
 
+/** "zarr level 3/6 (0 = finest), 20.5 x 29 x 20.5 µm": the resolution in memory. */
+function zarrSummary(origin: ZarrVolumeOrigin): string {
+  const spacing = origin.spacingUm
+    .map((s) => Number(s.toPrecision(3)))
+    .join(" x ");
+  return `zarr level ${origin.level}/${origin.levelCount - 1} (0 = finest), ${spacing} µm`;
+}
+
 export default function SceneDetailsTab({
   nvRef,
   serverlessMode,
@@ -50,6 +63,7 @@ export default function SceneDetailsTab({
   canEditVolume,
   onRemoveVolume,
   onAddMoreFiles,
+  onLoadUrl,
   onCreateDrawingLayer,
   onSaveScene,
   onOpacityChange,
@@ -65,7 +79,20 @@ export default function SceneDetailsTab({
     (s) => s.setCurrentImageIndex,
   );
   const drawingOptions = useFreeBrowseStore((s) => s.drawingOptions);
+  const zarrVolumes = useFreeBrowseStore((s) => s.zarrVolumes);
+  const urlLoading = useFreeBrowseStore(
+    (s) => s.urlLoadStatus.state === "loading",
+  );
+  const [urlText, setUrlText] = useState("");
 
+  const submitUrl = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!urlText.trim() || urlLoading) return;
+    onLoadUrl(urlText);
+    setUrlText("");
+  };
+
+  const colormaps: string[] = nvRef.current?.colormaps ?? [];
   const volumes = getVolumes();
   const currentVolume =
     currentImageIndex !== null ? volumes[currentImageIndex] : null;
@@ -115,6 +142,14 @@ export default function SceneDetailsTab({
                   <p className="text-sm font-medium break-words">
                     {volume.name || `Volume ${index + 1}`}
                   </p>
+                  {volume.id && zarrVolumes[volume.id] && (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      title={zarrVolumes[volume.id].url}
+                    >
+                      {zarrSummary(zarrVolumes[volume.id])}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-shrink-0 flex gap-1">
                   <Button
@@ -166,6 +201,27 @@ export default function SceneDetailsTab({
             <Upload className="mr-2 h-4 w-4" />
             Load volumes
           </Button>
+          <form className="flex gap-2" onSubmit={submitUrl}>
+            <Input
+              type="text"
+              aria-label="Volume or zarr URL"
+              placeholder="Volume or OME-Zarr URL"
+              className="h-8 text-xs"
+              value={urlText}
+              onChange={(e) => setUrlText(e.target.value)}
+              disabled={urlLoading}
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              disabled={!urlText.trim() || urlLoading}
+              title="Load from URL"
+            >
+              <Link className="mr-2 h-4 w-4" />
+              {urlLoading ? "Loading" : "Load"}
+            </Button>
+          </form>
           <Button
             variant="outline"
             size="sm"
@@ -278,10 +334,18 @@ export default function SceneDetailsTab({
             <div className="space-y-2">
               <Label className="text-sm font-medium">Colormap</Label>
               <Select
-                value={currentVolume.colormap || "gray"}
+                value={
+                  // niivue lists canonical names ("Gray") but a loader may
+                  // have set another case ("gray").
+                  colormaps.find(
+                    (c) =>
+                      c.toLowerCase() ===
+                      (currentVolume.colormap || "gray").toLowerCase(),
+                  ) ?? currentVolume.colormap
+                }
                 onChange={onColormapChange}
               >
-                {nvRef.current?.colormaps.map((colormap: string) => (
+                {colormaps.map((colormap: string) => (
                   <option key={colormap} value={colormap}>
                     {colormap}
                   </option>

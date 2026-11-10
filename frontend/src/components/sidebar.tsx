@@ -19,6 +19,7 @@ interface SidebarProps {
   onNvdFileSelect: (file: FileItem) => void;
   onImagingFileSelect: (file: FileItem) => void;
   onAddMoreFiles: () => void;
+  onLoadUrl: (url: string) => void;
   onAddSurfaceFiles: () => void;
   // Volume operations
   getVolumes: () => NVImage[];
@@ -145,6 +146,7 @@ export default function Sidebar(props: SidebarProps) {
             canEditVolume={props.canEditVolume}
             onRemoveVolume={props.onRemoveVolumeClick}
             onAddMoreFiles={props.onAddMoreFiles}
+            onLoadUrl={props.onLoadUrl}
             onCreateDrawingLayer={props.onCreateDrawingLayer}
             onSaveScene={props.onSaveScene}
             onOpacityChange={props.onOpacityChange}

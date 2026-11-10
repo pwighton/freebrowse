@@ -57,6 +57,8 @@ export type SaveVolumeState = {
   enabled: boolean;
   isExternal: boolean;
   url: string;
+  /** Set for a volume read from a zarr store: the pyramid level in memory. */
+  zarrLevel?: number;
 };
 
 /**

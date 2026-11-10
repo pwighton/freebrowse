@@ -168,7 +168,15 @@ export default function SaveDialog({
                         }
                         className="mt-1 text-xs"
                       />
+                      {volumeState.zarrLevel !== undefined && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Read from a zarr store (level {volumeState.zarrLevel}
+                          ). The document embeds this level&rsquo;s voxels, not
+                          a link to the store; check to also save it as NIfTI.
+                        </p>
+                      )}
                       {!saveState.isDownloadMode &&
+                        volumeState.zarrLevel === undefined &&
                         volumeState.isExternal &&
                         !volumeState.enabled && (
                           <p className="text-xs text-muted-foreground mt-1">

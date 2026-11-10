@@ -177,6 +177,7 @@ export default function FreeBrowse({
     surfaceFileInputRef,
     handleFileUpload,
     handleImagingFileSelect,
+    handleUrlLoad,
     handleNvdFileSelect,
     handleFileChange,
     handleAddMoreFiles,
@@ -211,6 +212,7 @@ export default function FreeBrowse({
           onNvdFileSelect={handleNvdFileSelect}
           onImagingFileSelect={handleImagingFileSelect}
           onAddMoreFiles={handleAddMoreFiles}
+          onLoadUrl={handleUrlLoad}
           onAddSurfaceFiles={handleAddSurfaceFiles}
           getVolumes={getVolumes}
           onToggleImageVisibility={toggleImageVisibility}
