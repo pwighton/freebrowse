@@ -225,17 +225,6 @@ export class NiiVue extends EventTarget {
     return new Uint8Array([1, 2, 3, 4]);
   }
 
-  async setColormapLabel(index: number, cmap: unknown): Promise<void> {
-    const volume = this.volumes[index];
-    if (!volume) return;
-    volume.colormapLabel = cmap;
-    this.emit("volumeUpdated", {
-      volumeIndex: index,
-      volume,
-      changes: { colormapLabel: cmap },
-    });
-  }
-
   private emitOrder(): void {
     this.emit("volumeOrderChanged", { volumes: this.volumes });
   }
@@ -393,7 +382,14 @@ export class NiiVue extends EventTarget {
   }
 
   get drawingColormaps(): string[] {
-    return ["_draw", "_itksnap", "_slicer3d"];
+    return [
+      "Draw",
+      "Freesurfer",
+      "Itksnap",
+      "Random",
+      "Roi_i256",
+      "Slicer3d",
+    ];
   }
 
   // --- extension context (nv-ext-drawing / magic wand) ---

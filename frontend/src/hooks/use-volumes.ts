@@ -2,38 +2,6 @@ import { useCallback } from "react";
 import { useFreeBrowseStore } from "@/store";
 import type { NiiVue } from "@niivue/niivue";
 
-/**
- * Built-in colormaps that are categorical/label maps (as opposed to continuous
- * gradients). When one of these is selected, FreeBrowse applies it as a label
- * colormap (setColormapLabel) so the volume renders as discrete regions.
- * niivue-mono does not tag colormaps as label-vs-continuous, so this list is
- * curated here; matched case-insensitively against nv.colormaps. Only palettes
- * we've made opaque (alpha 255) are included — random/nih still ship alpha 64
- * and would wash out, so they're excluded pending the Phase-7 systemic fix.
- */
-export const LABEL_COLORMAPS = new Set(["freesurfer", "roi_i256"]);
-
-/**
- * After a document loads, attach the label LUT to every volume whose
- * `colormap` names a categorical palette but that carries no `colormapLabel`.
- *
- * niivue-mono applies a document's `colormap` as a continuous gradient
- * (niivue/mono#69), so a migrated legacy scene -- `aseg` with `Freesurfer`,
- * say -- would render as a smooth ramp. A document the app itself saved after
- * a dropdown change already embeds `colormapLabel` and is left alone. Same
- * dual call as `handleColormapChange`.
- */
-export async function applyLabelColormapsAfterLoad(nv: NiiVue): Promise<void> {
-  const volumes = nv.volumes || [];
-  for (let i = 0; i < volumes.length; i++) {
-    const v = volumes[i] as { colormap?: unknown; colormapLabel?: unknown };
-    const name = typeof v.colormap === "string" ? v.colormap : "";
-    if (!name || v.colormapLabel) continue;
-    if (!LABEL_COLORMAPS.has(name.toLowerCase())) continue;
-    await nv.setColormapLabel(i, name);
-  }
-}
-
 export function useVolumes(
   nvRef: React.RefObject<NiiVue | null>,
   debouncedGLUpdate: () => void,
@@ -139,17 +107,9 @@ export function useVolumes(
       const nv = nvRef.current;
       if (currentImageIndex === null || !nv || !nv.volumes[currentImageIndex])
         return;
-      // Always set the continuous colormap (so the dropdown value derives from
-      // volume.colormap and round-trips through the document). If the chosen
-      // colormap is categorical, ALSO attach it as a label colormap so the
-      // volume renders as discrete regions; otherwise clear any label colormap.
-      // colormapLabel overrides colormap in the renderer, so setting both is safe.
+      // One colormap per volume: niivue derives the label LUT from a label
+      // colormap (freesurfer, roi_i256, ...) and clears it for a continuous one.
       void nv.setVolume(currentImageIndex, { colormap: newColormap });
-      if (LABEL_COLORMAPS.has(newColormap.toLowerCase())) {
-        void nv.setColormapLabel(currentImageIndex, newColormap);
-      } else {
-        void nv.setColormapLabel(currentImageIndex, null);
-      }
     },
     [currentImageIndex, nvRef],
   );
@@ -223,8 +183,13 @@ export function useVolumes(
       if (!nv || !nv.volumes[imageIndex]) return;
       const volume = nv.volumes[imageIndex];
       // Carry the volume's colormap onto the drawing so it looks the same as an
-      // editable layer (inverse of save-drawing). Captured before removal.
-      const cmap = volume.colormap as string | undefined;
+      // editable layer (inverse of save-drawing). Captured before removal. Only
+      // a label colormap can colour a drawing (niivue throws on any other), so
+      // a volume shown with a continuous one keeps the current drawing palette.
+      const volumeCmap = ((volume.colormap as string) || "").toLowerCase();
+      const cmap = nv.drawingColormaps.find(
+        (c) => c.toLowerCase() === volumeCmap,
+      );
       const name = ((volume.name as string) || "edit.nii").replace(
         /\.gz$/i,
         "",

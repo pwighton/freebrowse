@@ -16,7 +16,7 @@ const DEFAULT: DrawingOptions = {
   penFill: true,
   penErases: false,
   opacity: 1.0,
-  colormap: "_draw",
+  colormap: "draw",
   magicWand2dOnly: true,
   magicWandMaxDistanceMM: 15,
   magicWandThresholdPercent: 0.05,
@@ -40,11 +40,11 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     const nv = new NiiVue();
     nv.volumes.push({ id: "vol-0" });
     const spy = vi.spyOn(nv, "createEmptyDrawing");
-    const { result } = render(nv, { colormap: "_itksnap", opacity: 0.8 });
+    const { result } = render(nv, { colormap: "Itksnap", opacity: 0.8 });
     act(() => result.current.handleCreateDrawingLayer());
     expect(spy).toHaveBeenCalled();
     expect(nv.drawingVolume).not.toBeNull();
-    expect(nv.drawColormap).toBe("_itksnap");
+    expect(nv.drawColormap).toBe("Itksnap");
     expect(nv.drawOpacity).toBe(0.8);
     expect(nv.drawIsEnabled).toBe(false);
     expect(useFreeBrowseStore.getState().drawingOptions.mode).toBe("none");
@@ -121,9 +121,9 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     act(() => result.current.handleDrawingOpacityChange(0.4));
     expect(nv.drawOpacity).toBe(0.4);
     act(() =>
-      result.current.handleDrawingColormapChange(colormapEvent("_slicer3d")),
+      result.current.handleDrawingColormapChange(colormapEvent("Slicer3d")),
     );
-    expect(nv.drawColormap).toBe("_slicer3d");
+    expect(nv.drawColormap).toBe("Slicer3d");
   });
 
   test("undo calls nv.drawUndo", () => {
@@ -142,7 +142,6 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     const closeSpy = vi.spyOn(nv, "closeDrawing");
     const addSpy = vi.spyOn(nv, "addVolume");
     const volSpy = vi.spyOn(nv, "setVolume");
-    const labelSpy = vi.spyOn(nv, "setColormapLabel");
     const { result } = render(nv, { filename: "seg.nii.gz" });
     await act(async () => {
       await result.current.handleSaveDrawing();
@@ -155,11 +154,10 @@ describe("useDrawing — command dispatch (Phase 4a)", () => {
     expect(closeSpy).toHaveBeenCalled();
     // Raw bytes -> File named .nii (the .gz is stripped so the loader won't gunzip).
     expect(addSpy.mock.calls[0][0].name).toBe("seg.nii");
-    // Saved as a roi_i256 label volume (dropdown colormap + label colormap).
+    // Saved as a roi_i256 label volume (niivue derives the label LUT).
     expect(volSpy).toHaveBeenCalledWith(expect.any(Number), {
       colormap: "roi_i256",
     });
-    expect(labelSpy).toHaveBeenCalledWith(expect.any(Number), "roi_i256");
     expect(useFreeBrowseStore.getState().drawingOptions.mode).toBe("none");
     expect(useFreeBrowseStore.getState().activeTab).toBe("sceneDetails");
   });

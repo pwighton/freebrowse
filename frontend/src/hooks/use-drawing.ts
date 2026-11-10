@@ -117,7 +117,7 @@ export function useDrawing(
 
   const handleDrawingColormapChange = useCallback(
     // event-mirrored (colormap follows drawColormap). Options come from
-    // nv.drawingColormapNames() — the `_`-prefixed draw LUTs, not nv.colormaps.
+    // nv.drawingColormapNames() — the 0..255 label LUTs, not nv.colormaps.
     (event: React.ChangeEvent<HTMLSelectElement>) => {
       const nv = nvRef.current;
       if (nv) nv.drawColormap = event.target.value;
@@ -170,14 +170,13 @@ export function useDrawing(
     await nv.addVolume({ url: file, name });
     // Persist as a label volume with a dropdown-native, opaque palette
     // (roi_i256: sequential indices so pen values 1..N map 1:1, no `labels` so
-    // no legend). Set both colormap + colormapLabel (the 3c pattern) so it's
-    // consistent with the Scene-Details dropdown. Exact draw-color persistence
-    // is deferred (Phase 7). NOTE: the drawing's own `_draw` colormap is NOT
-    // carried over — the saved segmentation is recolored with roi_i256.
+    // no legend). niivue derives the label LUT from the label colormap. Exact
+    // draw-color persistence is deferred (Phase 7). NOTE: the drawing's own
+    // `draw` colormap is NOT carried over — the saved segmentation is
+    // recolored with roi_i256.
     const idx = nv.volumes.length - 1;
     if (idx >= 0) {
       await nv.setVolume(idx, { colormap: "roi_i256" });
-      await nv.setColormapLabel(idx, "roi_i256");
     }
 
     setDrawingOptions((prev) => ({ ...prev, mode: "none" }));

@@ -43,8 +43,14 @@ export default function DrawingTab({
   const drawingOptions = useFreeBrowseStore((s) => s.drawingOptions);
   const setDrawingOptions = useFreeBrowseStore((s) => s.setDrawingOptions);
 
-  // Drawing colormaps are the `_`-prefixed draw LUTs, NOT the volume colormaps.
+  // Every label colormap whose IDs fit a drawing's 0..255 bitmap, built-in or
+  // added with nv.addColormap. niivue lists them by canonical name ("Draw")
+  // but accepts any case, so match the stored name case-insensitively.
   const drawColormaps: string[] = nvRef.current?.drawingColormaps ?? [];
+  const selectedColormap =
+    drawColormaps.find(
+      (cm) => cm.toLowerCase() === drawingOptions.colormap.toLowerCase(),
+    ) ?? drawingOptions.colormap;
 
   return (
     <div className="flex flex-col h-full">
@@ -86,7 +92,7 @@ export default function DrawingTab({
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Drawing Colormap</Label>
                 <Select
-                  value={drawingOptions.colormap}
+                  value={selectedColormap}
                   onChange={onDrawingColormapChange}
                 >
                   {drawColormaps.map((cm) => (

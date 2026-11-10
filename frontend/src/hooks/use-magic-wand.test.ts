@@ -30,7 +30,7 @@ const DEFAULT: DrawingOptions = {
   penFill: true,
   penErases: false,
   opacity: 1.0,
-  colormap: "_draw",
+  colormap: "draw",
   magicWand2dOnly: true,
   magicWandMaxDistanceMM: 15,
   magicWandThresholdPercent: 0.05,

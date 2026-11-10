@@ -3,12 +3,10 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { NiiVue } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
-import { applyLabelColormapsAfterLoad, useVolumes } from "./use-volumes";
+import { useVolumes } from "./use-volumes";
 
 type VolRef = Parameters<typeof useVolumes>[0];
 const refOf = (nv: NiiVue) => ({ current: nv }) as unknown as VolRef;
-const asNv = (nv: NiiVue) =>
-  nv as unknown as Parameters<typeof applyLabelColormapsAfterLoad>[0];
 const noop = () => {};
 
 const colormapEvent = (value: string) =>
@@ -26,32 +24,22 @@ describe("useVolumes — colormap dropdown routing", () => {
     useFreeBrowseStore.setState({ currentImageIndex: null });
   });
 
-  test("categorical colormap -> setVolume + setColormapLabel(name)", () => {
+  test("label colormap -> a single setVolume (niivue derives the label LUT)", () => {
     const nv = volumeAt0();
     const setVol = vi.spyOn(nv, "setVolume");
-    const setLabel = vi.spyOn(nv, "setColormapLabel");
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
     act(() => result.current.handleColormapChange(colormapEvent("freesurfer")));
+    expect(setVol).toHaveBeenCalledTimes(1);
     expect(setVol).toHaveBeenCalledWith(0, { colormap: "freesurfer" });
-    expect(setLabel).toHaveBeenCalledWith(0, "freesurfer");
   });
 
-  test("categorical match is case-insensitive (canonical 'Freesurfer')", () => {
-    const nv = volumeAt0();
-    const setLabel = vi.spyOn(nv, "setColormapLabel");
-    const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
-    act(() => result.current.handleColormapChange(colormapEvent("Freesurfer")));
-    expect(setLabel).toHaveBeenCalledWith(0, "Freesurfer");
-  });
-
-  test("continuous colormap -> setVolume + clears label (setColormapLabel null)", () => {
+  test("continuous colormap -> a single setVolume", () => {
     const nv = volumeAt0();
     const setVol = vi.spyOn(nv, "setVolume");
-    const setLabel = vi.spyOn(nv, "setColormapLabel");
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
     act(() => result.current.handleColormapChange(colormapEvent("hot")));
+    expect(setVol).toHaveBeenCalledTimes(1);
     expect(setVol).toHaveBeenCalledWith(0, { colormap: "hot" });
-    expect(setLabel).toHaveBeenCalledWith(0, null);
   });
 
   test("no command when no volume is selected", () => {
@@ -61,27 +49,6 @@ describe("useVolumes — colormap dropdown routing", () => {
     const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
     act(() => result.current.handleColormapChange(colormapEvent("freesurfer")));
     expect(setVol).not.toHaveBeenCalled();
-  });
-});
-
-describe("applyLabelColormapsAfterLoad — label palettes named by colormap only", () => {
-  test("attaches the label LUT to categorical volumes lacking colormapLabel", async () => {
-    const nv = new NiiVue();
-    nv.volumes.push({ id: "v0", colormap: "Gray" });
-    nv.volumes.push({ id: "v1", colormap: "Freesurfer" });
-    nv.volumes.push({ id: "v2", colormap: "roi_i256", colormapLabel: { lut: [] } });
-    nv.volumes.push({ id: "v3" });
-    const setLabel = vi.spyOn(nv, "setColormapLabel");
-    await applyLabelColormapsAfterLoad(asNv(nv));
-    expect(setLabel).toHaveBeenCalledTimes(1);
-    expect(setLabel).toHaveBeenCalledWith(1, "Freesurfer");
-  });
-
-  test("no volumes -> no calls", async () => {
-    const nv = new NiiVue();
-    const setLabel = vi.spyOn(nv, "setColormapLabel");
-    await applyLabelColormapsAfterLoad(asNv(nv));
-    expect(setLabel).not.toHaveBeenCalled();
   });
 });
 
@@ -141,9 +108,24 @@ describe("useVolumes — edit volume as drawing", () => {
     expect(saveSpy).toHaveBeenCalledWith({ filename: "", volumeByIndex: 1 });
     expect(rmSpy).toHaveBeenCalledWith(1);
     expect((loadSpy.mock.calls[0][0] as File).name).toBe("seg.nii"); // .gz stripped
-    expect(nv.drawColormap).toBe("roi_i256"); // colormap carried onto the drawing
+    expect(nv.drawColormap).toBe("Roi_i256"); // label colormap carried onto the drawing
     expect(nv.drawIsEnabled).toBe(true);
     expect(useFreeBrowseStore.getState().drawingOptions.mode).toBe("pen");
+    expect(useFreeBrowseStore.getState().activeTab).toBe("drawing");
+  });
+
+  test("a continuous colormap is not carried onto the drawing", async () => {
+    const nv = new NiiVue();
+    nv.volumes.push({ id: "vol-0", name: "orig.nii" });
+    nv.volumes.push({ id: "vol-1", name: "mask.nii.gz", colormap: "Gray" });
+    nv.drawColormap = "Draw";
+    useFreeBrowseStore.setState({ currentImageIndex: 1 });
+    const { result } = renderHook(() => useVolumes(refOf(nv), noop, noop));
+    await act(async () => {
+      await result.current.handleEditVolume(1);
+    });
+    expect(nv.drawColormap).toBe("Draw");
+    expect(nv.drawIsEnabled).toBe(true);
     expect(useFreeBrowseStore.getState().activeTab).toBe("drawing");
   });
 });

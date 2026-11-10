@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from "react";
 import { useFreeBrowseStore } from "@/store";
 import type { NiiVue } from "@niivue/niivue";
 import type { FileItem } from "@/components/file-list";
-import { applyLabelColormapsAfterLoad } from "@/hooks/use-volumes";
 import { deploymentConfig, getFreeBrowseConfig } from "@/lib/deployment-config";
 
 const LEGACY_NVD_MESSAGE =
@@ -115,8 +114,6 @@ export function useFileLoading(
       // to its built-in default, silently changing e.g. crosshair colour or view
       // mode on every load. A document should only change what it sets.
       await nv.loadDocument(file, { fill: "current" });
-      // Migrated legacy documents name label palettes by `colormap` only.
-      await applyLabelColormapsAfterLoad(nv);
 
       // Select a first volume / surface so the details tabs have a target. The
       // lists themselves follow via events.
