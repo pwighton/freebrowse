@@ -1,5 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { NiiVue } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
@@ -102,6 +102,7 @@ describe("useFileLoading — zarr stores", () => {
     );
     expect(zarr.loadZarrLevel).toHaveBeenCalledWith(nv, "https://host/a.zarr", {
       zarrVersion: undefined,
+      colormap: undefined,
     });
     const state = useFreeBrowseStore.getState();
     expect(state.zarrVolumes[nv.volumes[0].id as string]).toEqual({
@@ -143,7 +144,7 @@ describe("useFileLoading — zarr stores", () => {
     expect(zarr.loadZarrLevel).toHaveBeenCalledWith(
       expect.anything(),
       "https://host/zarr/1234/",
-      { zarrVersion: 2 },
+      { zarrVersion: 2, colormap: undefined },
     );
   });
 
@@ -202,7 +203,7 @@ describe("useFileLoading — zarr stores", () => {
     expect(zarr.loadZarrLevel).toHaveBeenCalledWith(
       expect.anything(),
       "https://host/a.zarr",
-      { zarrVersion: undefined },
+      { zarrVersion: undefined, colormap: undefined },
     );
   });
 
@@ -213,7 +214,7 @@ describe("useFileLoading — zarr stores", () => {
     expect(zarr.loadZarrLevel).toHaveBeenCalledWith(
       expect.anything(),
       "https://host/zarr/1234/",
-      { zarrVersion: 2 },
+      { zarrVersion: 2, colormap: undefined },
     );
   });
 
@@ -234,5 +235,139 @@ describe("useFileLoading — zarr stores", () => {
     await act(() => result.current.handleUrlLoad("   "));
     expect(addVolume).not.toHaveBeenCalled();
     expect(zarr.probeZarr).not.toHaveBeenCalled();
+  });
+});
+
+describe("useFileLoading — ?vol= and ?zarr= parameters", () => {
+  const description = {
+    url: "https://host/store",
+    levels: [{ level: 0, spacingUm: [1, 1, 1] }],
+  };
+
+  /** Mount the hook with `search` as the page's query string. */
+  function mountWith(search: string) {
+    window.history.replaceState(null, "", "/" + search);
+    const nv = new NiiVue();
+    (nv as unknown as { canvas: unknown }).canvas = {};
+    renderHook(() => useFileLoading(refOf(nv), noop, noop, noop));
+    return nv;
+  }
+
+  beforeEach(() => {
+    useFreeBrowseStore.setState({
+      zarrVolumes: {},
+      urlLoadStatus: { state: "idle" },
+      showUploader: true,
+      currentImageIndex: null,
+    });
+    zarr.isZarrUrl.mockReset().mockImplementation((u: string) => /\.zarr/.test(u));
+    zarr.probeZarr.mockReset().mockResolvedValue(null);
+    zarr.loadZarrLevel
+      .mockReset()
+      .mockImplementation(async (nv: NiiVue, url: string) => {
+        // Slower than a plain volume, to show the order is still the URL's.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        await nv.addVolume({ url: "file", name: `zarr:${url}` });
+        return { description, level: 0, volumeIds: [nv.volumes.at(-1)?.id] };
+      });
+  });
+
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  test("repeated and mixed parameters load in the order written", async () => {
+    const nv = mountWith(
+      "?zarr=https://host/store/&vol=https://host/a.nii.gz&vol=https://host/b.ome.zarr&vol=https://host/c.nii.gz",
+    );
+    await waitFor(() => expect(nv.volumes).toHaveLength(4));
+    expect(nv.volumes.map((v) => v.name)).toEqual([
+      "zarr:https://host/store/",
+      "a.nii.gz",
+      "zarr:https://host/b.ome.zarr",
+      "c.nii.gz",
+    ]);
+    await waitFor(() =>
+      expect(useFreeBrowseStore.getState().urlLoadStatus).toEqual({
+        state: "idle",
+      }),
+    );
+  });
+
+  test("filename= names plain volumes by position", async () => {
+    const nv = mountWith(
+      "?vol=blob:1&filename=first.nii.gz&vol=blob:2&filename=second.nii.gz",
+    );
+    await waitFor(() => expect(nv.volumes).toHaveLength(2));
+    expect(nv.volumes.map((v) => v.name)).toEqual([
+      "first.nii.gz",
+      "second.nii.gz",
+    ]);
+  });
+
+  test("cmap= sets the colormap of the volume written before it", async () => {
+    const nv = mountWith(
+      "?vol=https://host/orig.nii.gz&vol=https://host/aseg.nii.gz&cmap=freesurfer",
+    );
+    await waitFor(() => expect(nv.volumes).toHaveLength(2));
+    expect(nv.volumes.map((v) => [v.name, v.colormap])).toEqual([
+      ["orig.nii.gz", undefined],
+      ["aseg.nii.gz", "Freesurfer"],
+    ]);
+  });
+
+  test("cmap= reaches a zarr store, and one per volume is allowed", async () => {
+    const nv = mountWith(
+      "?zarr=https://host/store/&cmap=hot&vol=https://host/a.nii.gz&cmap=Cool",
+    );
+    await waitFor(() => expect(nv.volumes).toHaveLength(2));
+    expect(zarr.loadZarrLevel).toHaveBeenCalledWith(
+      expect.anything(),
+      "https://host/store/",
+      { zarrVersion: undefined, colormap: "Hot" },
+    );
+    expect(nv.volumes[1].colormap).toBe("Cool");
+  });
+
+  test("an unknown cmap loads with the default and says so", async () => {
+    const nv = mountWith("?vol=https://host/a.nii.gz&cmap=nosuchmap");
+    await waitFor(() => expect(nv.volumes).toHaveLength(1));
+    expect(nv.volumes[0].colormap).toBeUndefined();
+    await waitFor(() =>
+      expect(useFreeBrowseStore.getState().urlLoadStatus).toEqual({
+        state: "error",
+        url: "https://host/a.nii.gz",
+        message: 'Unknown colormap "nosuchmap"; loaded with the default.',
+      }),
+    );
+  });
+
+  test("filename= before its vol= still names the first volume", async () => {
+    const nv = mountWith("?filename=scan.nii.gz&vol=blob:1");
+    await waitFor(() => expect(nv.volumes).toHaveLength(1));
+    expect(nv.volumes[0].name).toBe("scan.nii.gz");
+  });
+
+  test("a failure among several is still reported after later successes", async () => {
+    zarr.loadZarrLevel.mockRejectedValueOnce(new Error("unsupported dtype"));
+    const nv = mountWith("?zarr=https://host/bad/&vol=https://host/a.nii.gz");
+    await waitFor(() => expect(nv.volumes).toHaveLength(1));
+    await waitFor(() =>
+      expect(useFreeBrowseStore.getState().urlLoadStatus).toEqual({
+        state: "error",
+        url: "https://host/bad/",
+        message: "unsupported dtype",
+      }),
+    );
+    expect(useFreeBrowseStore.getState().showUploader).toBe(false);
+  });
+
+  test("no parameters, no load", async () => {
+    const nv = mountWith("");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(nv.volumes).toHaveLength(0);
+    expect(useFreeBrowseStore.getState().urlLoadStatus).toEqual({
+      state: "idle",
+    });
   });
 });

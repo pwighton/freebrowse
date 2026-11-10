@@ -10,6 +10,8 @@ export interface FileItem {
   zarr?: boolean;
   /** The store's zarr format, when a probe already found it. */
   zarrVersion?: 2 | 3;
+  /** Colormap to load the volume with (every channel, for a zarr store). */
+  colormap?: string;
 }
 
 interface FileListProps {

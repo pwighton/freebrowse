@@ -218,9 +218,10 @@ export function useFileLoading(
     ],
   );
 
+  // Resolves to null on success, else the error shown to the user.
   const handleImagingFileSelect = useCallback(
-    async (file: FileItem) => {
-      if (!nvRef.current) return;
+    async (file: FileItem): Promise<string | null> => {
+      if (!nvRef.current) return null;
       const nv = nvRef.current;
 
       setUrlLoadStatus({ state: "loading", url: file.url });
@@ -242,6 +243,15 @@ export function useFileLoading(
           throw new Error("Canvas failed to initialize after 2 seconds");
         }
 
+        // A requested colormap, as niivue names it ("freesurfer" ->
+        // "Freesurfer"). An unknown name loads with the default and is
+        // reported, rather than failing the load.
+        const colormap = file.colormap
+          ? nv.colormaps.find(
+              (c) => c.toLowerCase() === file.colormap?.toLowerCase(),
+            )
+          : undefined;
+
         if (file.zarr || isZarrUrl(file.url)) {
           // One whole pyramid level, read into memory: from here on it is an
           // ordinary volume. niivue picks readers by file extension and would
@@ -249,6 +259,7 @@ export function useFileLoading(
           console.log("Adding zarr store to scene:", file.url);
           const loaded = await loadZarrLevel(nv, file.url, {
             zarrVersion: file.zarrVersion,
+            colormap,
           });
           const { description, level } = loaded;
           addZarrVolumes(loaded.volumeIds, {
@@ -262,6 +273,7 @@ export function useFileLoading(
           const volume = {
             url: file.url,
             name: basename,
+            ...(colormap ? { colormap } : {}),
           };
 
           console.log("Adding imaging file to scene:", volume);
@@ -276,16 +288,20 @@ export function useFileLoading(
         }
 
         console.log("Imaging file loaded successfully");
+        if (file.colormap && !colormap) {
+          const message = `Unknown colormap "${file.colormap}"; loaded with the default.`;
+          setUrlLoadStatus({ state: "error", url: file.url, message });
+          return message;
+        }
         setUrlLoadStatus({ state: "idle" });
+        return null;
       } catch (error) {
         console.error("Error loading imaging file:", error);
-        setUrlLoadStatus({
-          state: "error",
-          url: file.url,
-          message: describeLoadError(error),
-        });
+        const message = describeLoadError(error);
+        setUrlLoadStatus({ state: "error", url: file.url, message });
         // Nothing to look at: bring the drop zone back.
         if (nv.volumes.length === 0) setShowUploader(true);
+        return message;
       }
     },
     [
@@ -488,33 +504,56 @@ export function useFileLoading(
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load volume from URL parameter on initial load (app only, as above).
+  // Load volumes from URL parameters on initial load (app only, as above).
+  // `?vol=` takes a volume file, or a zarr store whose URL has a `.zarr`
+  // segment; `?zarr=` takes a store whose URL has none (DANDI's). Either may
+  // be repeated and mixed: they load one after another in the order written,
+  // so the first is the base layer. `cmap=` (a colormap) and `filename=`
+  // apply to the volume written just before them.
   useEffect(() => {
     if (!getFreeBrowseConfig().readUrlParams) return;
     const urlParams = new URLSearchParams(window.location.search);
-    const volParam = urlParams.get("vol");
-
-    if (volParam) {
-      console.log("Loading volume from URL parameter:", volParam);
-      const filename = urlParams.get("filename") || volParam.split("/").pop() || volParam;
-      const fileItem: FileItem = { filename, url: volParam };
-      handleImagingFileSelect(fileItem);
+    const items: FileItem[] = [];
+    // A `filename=` / `cmap=` written before any volume goes to the first.
+    const leading: Partial<FileItem> = {};
+    for (const [key, value] of urlParams) {
+      if (!value) continue;
+      if (key === "vol" || key === "zarr") {
+        const filename =
+          key === "zarr" ? value : value.split("/").pop() || value;
+        items.push(
+          key === "zarr"
+            ? { filename, url: value, zarr: true }
+            : { filename, url: value },
+        );
+      } else if (key === "filename" || key === "cmap") {
+        const target = items.at(-1) ?? leading;
+        if (key === "filename") target.filename = value;
+        else target.colormap = value;
+      }
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (items.length > 0) Object.assign(items[0], leading);
+    if (items.length === 0) return;
 
-  // Load an OME-Zarr store from URL parameter on initial load (app only, as
-  // above). `?vol=` also takes a store whose URL has a `.zarr` segment;
-  // `?zarr=` is for stores whose URL has none.
-  useEffect(() => {
-    if (!getFreeBrowseConfig().readUrlParams) return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const zarrParam = urlParams.get("zarr");
-
-    if (zarrParam) {
-      console.log("Loading zarr store from URL parameter:", zarrParam);
-      const filename = urlParams.get("filename") || zarrParam;
-      handleImagingFileSelect({ filename, url: zarrParam, zarr: true });
-    }
+    void (async () => {
+      const failed: { url: string; message: string }[] = [];
+      for (const item of items) {
+        console.log("Loading volume from URL parameter:", item.url);
+        const error = await handleImagingFileSelect(item);
+        if (error) failed.push({ url: item.url, message: error });
+      }
+      // A later success cleared the status; report every failure together.
+      if (failed.length > 0 && items.length > 1) {
+        setUrlLoadStatus({
+          state: "error",
+          url: failed.map((f) => f.url).join(", "),
+          message:
+            failed.length === 1
+              ? failed[0].message
+              : `${failed.length} of ${items.length} could not be loaded. First error: ${failed[0].message}`,
+        });
+      }
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load embedded NVD data (for self-contained HTML files)

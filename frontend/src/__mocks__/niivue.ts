@@ -182,11 +182,16 @@ export class NiiVue extends EventTarget {
   drawScene(): void {}
 
   // --- volumes ---
-  async addVolume(opts: { url?: string; name?: string }): Promise<void> {
+  async addVolume(opts: {
+    url?: string;
+    name?: string;
+    colormap?: string;
+  }): Promise<void> {
     const volume: MockVolume = {
       id: `vol-${this.volumes.length}`,
       url: opts.url,
       name: opts.name ?? opts.url,
+      ...(opts.colormap ? { colormap: opts.colormap } : {}),
     };
     this.volumes.push(volume);
     this.emit("volumeLoaded", { volume });
@@ -375,7 +380,7 @@ export class NiiVue extends EventTarget {
   }
 
   get colormaps(): string[] {
-    return ["gray", "hot", "cool", "winter"];
+    return ["Gray", "Hot", "Cool", "Winter", "Freesurfer"];
   }
   get meshShaders(): string[] {
     return ["phong", "matcap", "outline"];

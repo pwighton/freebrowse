@@ -238,6 +238,23 @@ describe("loadZarrLevel", () => {
     });
   });
 
+  test("a colormap option overrides every channel's colour", async () => {
+    zarrModule.omeZarrVolumesFrom.mockResolvedValue([
+      { url: "f0", name: "x", colormap: "green" },
+      { url: "f1", name: "y", colormap: "violet" },
+    ]);
+    const nv = new NiiVue();
+    const addVolume = vi.spyOn(nv, "addVolume");
+    await loadZarrLevel(asNv(nv), "https://host/a.zarr", { colormap: "Hot" });
+    expect(addVolume.mock.calls.map((c) => c[0])).toEqual([
+      { url: "f0", name: "sample DAPI", colormap: "Hot" },
+      { url: "f1", name: "sample GFP", colormap: "Hot" },
+    ]);
+    expect(zarrModule.omeZarrVolumesFrom).toHaveBeenCalledWith(source, {
+      level: 1,
+    });
+  });
+
   test("a failed read adds nothing", async () => {
     zarrModule.omeZarrVolumesFrom.mockRejectedValue(new Error("unsupported dtype"));
     const nv = new NiiVue();

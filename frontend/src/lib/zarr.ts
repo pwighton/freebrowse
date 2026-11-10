@@ -49,6 +49,8 @@ export interface LoadZarrLevelOptions {
   levelBudgetBytes?: number;
   /** The store's format when already known (see {@link probeZarr}). */
   zarrVersion?: 2 | 3;
+  /** Colormap for every loaded channel, instead of the store's own colours. */
+  colormap?: string;
 }
 
 export interface LoadedZarrLevel {
@@ -211,7 +213,7 @@ export async function loadZarrLevel(
   url: string,
   options: LoadZarrLevelOptions = {},
 ): Promise<LoadedZarrLevel> {
-  const { zarrVersion, ...readOptions } = options;
+  const { zarrVersion, colormap, ...readOptions } = options;
   const { zarr, source, description } = await openZarr(
     url,
     options.levelBudgetBytes,
@@ -231,6 +233,7 @@ export async function loadZarrLevel(
     await nv.addVolume({
       ...volume,
       name: volumeName(label, description.channels, channels[i]),
+      ...(colormap ? { colormap } : {}),
     });
   }
   const volumeIds = nv.volumes
