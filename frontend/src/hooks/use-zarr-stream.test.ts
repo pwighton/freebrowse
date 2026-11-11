@@ -5,7 +5,9 @@ vi.mock("@niivue/niivue", () => import("@/__mocks__/niivue"));
 
 import { NiiVue, SLICE_TYPE } from "@/__mocks__/niivue";
 import { useFreeBrowseStore } from "@/store";
+import { DEFAULT_ZARR_SETTINGS } from "@/lib/zarr-settings";
 import {
+  currentStreamPlan,
   useZarrStream,
   viewCentreFraction,
   zarrParamsFromLocation,
@@ -14,6 +16,7 @@ import {
 const zarr = vi.hoisted(() => ({
   streamZarr: vi.fn(),
   describeZarr: vi.fn(),
+  clearZarrDiskCache: vi.fn(),
 }));
 vi.mock("@/lib/zarr", () => zarr);
 
@@ -30,7 +33,30 @@ const describe_ = (url: string, dims = [100, 80, 60]) => ({
 });
 
 /** niivue's handle on a stream, as far as the hook drives it. */
-const handles = new Map<string, { setFocus: ReturnType<typeof vi.fn> }>();
+type Handle = Record<
+  "setFocus" | "setBudgetPlan" | "setMaxDetail" | "setSwapPolicy",
+  ReturnType<typeof vi.fn>
+>;
+const handles = new Map<string, Handle>();
+const newHandle = (): Handle => ({
+  setFocus: vi.fn(),
+  setBudgetPlan: vi.fn(async () => {}),
+  setMaxDetail: vi.fn(async () => {}),
+  setSwapPolicy: vi.fn(),
+});
+
+/** The plan a store is opened with under the default settings (WebGL2). */
+const DEFAULT_PLAN = {
+  budgetPlan: {
+    focus: "crosshair",
+    radius: "auto",
+    detail: 1,
+    budgetBytes: 1280 * 1024 * 1024,
+    maxBricks: 240,
+  },
+  minLevel: 0,
+  swapPolicy: "replace",
+};
 
 function withCanvas() {
   const nv = new NiiVue();
@@ -52,10 +78,14 @@ beforeEach(() => {
     appMode: "zarr",
     zarrStreams: [],
     zarrProgress: null,
+    zarrSettings: DEFAULT_ZARR_SETTINGS,
+    zarrFinestLevel: 0,
+    activeBackend: "webgl2",
     urlLoadStatus: { state: "idle" },
     showUploader: true,
     currentImageIndex: null,
   });
+  zarr.clearZarrDiskCache.mockReset().mockResolvedValue(undefined);
   zarr.describeZarr.mockReset().mockImplementation(async (url: string) => describe_(url));
   zarr.streamZarr
     .mockReset()
@@ -68,7 +98,7 @@ beforeEach(() => {
         if (options.replace !== false) await nv.removeAllVolumes();
         await nv.addVolume({ url: `streamed://${url}`, name: url, colormap: options.colormap });
         const volumeId = nv.volumes.at(-1)?.id as string;
-        const volume = { setFocus: vi.fn() };
+        const volume = newHandle();
         handles.set(volumeId, volume);
         return { description: describe_(url), volume, volumeId, channel: options.channel ?? 0 };
       },
@@ -160,6 +190,8 @@ describe("useZarrStream — opening a store", () => {
       channel: undefined,
       timepoint: undefined,
       colormap: "Hot",
+      plan: DEFAULT_PLAN,
+      persist: false,
     });
     const state = useFreeBrowseStore.getState();
     expect(state.zarrStreams).toEqual([
@@ -245,6 +277,8 @@ describe("useZarrStream — a second store on top", () => {
       zarrVersion: 2,
       replace: false,
       coarseFloor: false,
+      plan: DEFAULT_PLAN,
+      persist: false,
     });
     expect(nv.volumes).toHaveLength(2);
     const state = useFreeBrowseStore.getState();
@@ -393,5 +427,131 @@ describe("useZarrStream — following niivue", () => {
       ["https://host/b.zarr", 1, "Red"],
     ]);
     expect(useFreeBrowseStore.getState().zarrStreams.map((s) => s.channel)).toEqual([0, 1]);
+  });
+});
+
+describe("useZarrStream — zarr settings", () => {
+  async function withBase() {
+    const nv = withCanvas();
+    const hook = renderHook(() => useZarrStream(refOf(nv)));
+    await act(async () => {
+      await hook.result.current.openZarrStore("https://host/a.zarr");
+    });
+    return { nv, handle: handles.get(nv.volumes[0].id as string) as Handle, ...hook };
+  }
+  const set = useFreeBrowseStore.getState;
+
+  test("the plan follows the settings, the backend's memory and the store's levels", () => {
+    useFreeBrowseStore.setState({
+      activeBackend: "webgpu",
+      zarrFinestLevel: 5,
+      zarrSettings: {
+        ...DEFAULT_ZARR_SETTINGS,
+        detailPreset: "uniform",
+        maxBricks: 64,
+        detailFalloff: 0.5,
+        swapPolicy: "keepUntilCovered",
+        gpuMemory: { webgpu: 4096 * 1024 * 1024 },
+      },
+    });
+    expect(currentStreamPlan(3)).toEqual({
+      budgetPlan: {
+        focus: "none",
+        radius: "volume",
+        detail: 0.5,
+        budgetBytes: 4096 * 1024 * 1024,
+        maxBricks: 64,
+      },
+      minLevel: 2,
+      swapPolicy: "keepUntilCovered",
+    });
+  });
+
+  test("a changed setting is applied to the running stream", async () => {
+    const { handle } = await withBase();
+    handle.setBudgetPlan.mockClear();
+    await act(async () => {
+      set().setZarrSettings({ detailPreset: "interactive", swapPolicy: "keepUntilCovered" });
+      set().setZarrFinestLevel(1);
+    });
+    expect(handle.setBudgetPlan).toHaveBeenLastCalledWith(
+      expect.objectContaining({ focus: "crosshair", maxBricks: 128 }),
+    );
+    expect(handle.setSwapPolicy).toHaveBeenLastCalledWith("keepUntilCovered");
+    // The test store has a single level, so the finest level is clamped to it.
+    expect(handle.setMaxDetail).toHaveBeenLastCalledWith(0);
+  });
+
+  test("a store is opened with the disk cache when it is on", async () => {
+    useFreeBrowseStore.setState({
+      zarrSettings: { ...DEFAULT_ZARR_SETTINGS, diskCache: true },
+    });
+    await withBase();
+    expect(zarr.streamZarr.mock.calls[0][2]).toMatchObject({ persist: true });
+  });
+
+  test("turning the disk cache on opens the stores again", async () => {
+    await withBase();
+    zarr.streamZarr.mockClear();
+    await act(async () => {
+      set().setZarrSettings({ diskCache: true });
+    });
+    await waitFor(() => expect(zarr.streamZarr).toHaveBeenCalledTimes(1));
+    expect(zarr.streamZarr.mock.calls[0][2]).toMatchObject({ persist: true });
+    expect(zarr.clearZarrDiskCache).not.toHaveBeenCalled();
+  });
+
+  test("turning it off opens them again without it and deletes what was kept", async () => {
+    useFreeBrowseStore.setState({
+      zarrSettings: { ...DEFAULT_ZARR_SETTINGS, diskCache: true },
+    });
+    await withBase();
+    zarr.streamZarr.mockClear();
+    await act(async () => {
+      set().setZarrSettings({ diskCache: false });
+    });
+    await waitFor(() => expect(zarr.clearZarrDiskCache).toHaveBeenCalledTimes(1));
+    expect(zarr.streamZarr.mock.calls[0][2]).toMatchObject({ persist: false });
+  });
+
+  test("opening the stores again keeps each layer's window, opacity and colormap", async () => {
+    const { nv } = await withBase();
+    Object.assign(nv.volumes[0], { calMin: 40, calMax: 900, opacity: 0.5, colormap: "Hot" });
+    zarr.streamZarr.mockClear();
+    await act(async () => {
+      set().setZarrSettings({ diskCache: true });
+    });
+    await waitFor(() => expect(zarr.streamZarr).toHaveBeenCalledTimes(1));
+    expect(zarr.streamZarr.mock.calls[0][2]).toMatchObject({
+      calMin: 40,
+      calMax: 900,
+      opacity: 0.5,
+      colormap: "Hot",
+    });
+  });
+
+  test("another channel keeps colormap and opacity, and gets a fresh window", async () => {
+    const { nv, result } = await withBase();
+    Object.assign(nv.volumes[0], { calMin: 40, calMax: 900, opacity: 0.5, colormap: "Hot" });
+    zarr.streamZarr.mockClear();
+    await act(async () => {
+      await result.current.selectZarrFrame(nv.volumes[0].id as string, { channel: 1 });
+    });
+    const options = zarr.streamZarr.mock.calls[0][2];
+    expect(options).toMatchObject({ channel: 1, opacity: 0.5, colormap: "Hot" });
+    expect(options).not.toHaveProperty("calMin");
+    expect(options).not.toHaveProperty("calMax");
+  });
+
+  test("a uniform plan has no focus for a pan to move", async () => {
+    const { nv, handle } = await withBase();
+    await act(async () => {
+      set().setZarrSettings({ detailPreset: "uniform" });
+    });
+    nv.sliceType = SLICE_TYPE.AXIAL;
+    Object.assign(nv, { pan2Dxyzmm: [50, -10, 0, 4] });
+    emit(nv, "change", { property: "pan2Dxyzmm" });
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(handle.setFocus).not.toHaveBeenCalled();
   });
 });

@@ -3,12 +3,14 @@ import {
   type NiiVueOptions,
   type SettingsSavePolicy,
 } from "@niivue/niivue";
+import { gpuMemoryFor, preferredBackend } from "@/lib/rendering";
+import { useFreeBrowseStore } from "@/store";
 
 /**
  * The options FreeBrowse constructs its NiiVue instance with. Shared by the
  * app entry (`main.tsx`) and the library (`createFreeBrowseInstance`) so both
- * produce identical instances. No `backend` option: niivue picks WebGPU when
- * `navigator.gpu` exists and falls back to WebGL2 otherwise.
+ * produce identical instances. The rendering backend is not among them: it
+ * follows the user's setting, see `createFreeBrowseInstance`.
  */
 export const DEFAULT_NIIVUE_OPTIONS: Partial<NiiVueOptions> = {
   placeholderText: "Drag-drop images",
@@ -49,5 +51,16 @@ export const FREEBROWSE_SAVE_SETTINGS: SettingsSavePolicy = {
 export function createFreeBrowseInstance(
   overrides: Partial<NiiVueOptions> = {},
 ): NiiVue {
-  return new NiiVue({ ...DEFAULT_NIIVUE_OPTIONS, ...overrides });
+  // niivue draws with WebGL2 unless asked for WebGPU, and falls back to WebGL2
+  // by itself when WebGPU cannot start. The GPU memory a streamed volume may
+  // take is read when the view starts, and differs by backend; `useRendering`
+  // corrects it if the fallback happened.
+  const { useWebGpu, zarrSettings } = useFreeBrowseStore.getState();
+  const backend = preferredBackend(useWebGpu);
+  return new NiiVue({
+    ...DEFAULT_NIIVUE_OPTIONS,
+    backend,
+    maxChunkResidencyBytes: gpuMemoryFor(backend, zarrSettings.gpuMemory),
+    ...overrides,
+  });
 }

@@ -2,6 +2,7 @@ import { useFreeBrowseStore } from "@/store";
 
 let pendingImagingUpload: ((ok: boolean) => void) | null = null;
 let pendingSessionDelete: ((ok: boolean) => void) | null = null;
+let pendingDiskCache: ((ok: boolean) => void) | null = null;
 
 export function requestImagingUploadConfirmation(): Promise<boolean> {
   const state = useFreeBrowseStore.getState();
@@ -40,5 +41,26 @@ export function resolveSessionDeleteConfirmation(ok: boolean): void {
   useFreeBrowseStore.getState().setSessionDeleteConfirmDialogOpen(false);
   const resolver = pendingSessionDelete;
   pendingSessionDelete = null;
+  if (resolver) resolver(ok);
+}
+
+/** Ask before chunks of a store are written to the browser's storage. */
+export function requestDiskCacheConfirmation(): Promise<boolean> {
+  const state = useFreeBrowseStore.getState();
+  if (state.skipDiskCacheConfirmation) return Promise.resolve(true);
+  if (pendingDiskCache) {
+    pendingDiskCache(false);
+    pendingDiskCache = null;
+  }
+  return new Promise<boolean>((resolve) => {
+    pendingDiskCache = resolve;
+    state.setDiskCacheConfirmDialogOpen(true);
+  });
+}
+
+export function resolveDiskCacheConfirmation(ok: boolean): void {
+  useFreeBrowseStore.getState().setDiskCacheConfirmDialogOpen(false);
+  const resolver = pendingDiskCache;
+  pendingDiskCache = null;
   if (resolver) resolver(ok);
 }

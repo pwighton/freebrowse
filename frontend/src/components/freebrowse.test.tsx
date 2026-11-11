@@ -163,7 +163,8 @@ describe("FreeBrowse", () => {
     expect(screen.getByText("Stream an OME-Zarr store")).toBeInTheDocument();
     expect(screen.queryByText("Load Medical Images")).not.toBeInTheDocument();
     expect(screen.getByText("zarr streaming")).toBeInTheDocument();
-    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    // The volume tab and the zarr settings tab.
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
     for (const name of ["Load volumes", "Create empty drawing layer", "Download"]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }

@@ -10,12 +10,16 @@ import { useMagicWand } from "@/hooks/use-magic-wand";
 import { useSave } from "@/hooks/use-save";
 import { useFileLoading } from "@/hooks/use-file-loading";
 import { useZarrStream } from "@/hooks/use-zarr-stream";
+import { useRendering } from "@/hooks/use-rendering";
 import { useAiCapabilities } from "@/hooks/use-ai-capabilities";
 import { useAiSession } from "@/hooks/use-ai-session";
 import {
+  requestDiskCacheConfirmation,
+  resolveDiskCacheConfirmation,
   resolveImagingUploadConfirmation,
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
+import { DEFAULT_GPU_MEMORY, preferredBackend } from "@/lib/rendering";
 import type { NiiVue } from "@niivue/niivue";
 import { rightDragModeFor, type FreeBrowseMode } from "@/lib/capabilities";
 import { getFreeBrowseConfig } from "@/lib/deployment-config";
@@ -28,6 +32,7 @@ import SaveDialog from "./dialogs/save-dialog";
 import SettingsDialog from "./dialogs/settings-dialog";
 import ImagingUploadConfirmationDialog from "./dialogs/imaging-upload-confirmation-dialog";
 import SessionDeleteConfirmationDialog from "./dialogs/session-delete-confirmation-dialog";
+import DiskCacheConfirmationDialog from "./dialogs/disk-cache-confirmation-dialog";
 
 export interface FreeBrowseProps {
   /**
@@ -269,6 +274,23 @@ function FreeBrowseView({
   const { openZarrStore, addZarrStore, selectZarrFrame } =
     useZarrStream(nvRef);
 
+  const { setUseWebGpu, setGpuMemory } = useRendering(nvRef, hostInstance);
+
+  // The disk cache writes streamed data to the browser's storage: ask first.
+  const handleZarrDiskCacheChange = async (enabled: boolean) => {
+    if (enabled && !(await requestDiskCacheConfirmation())) return;
+    useFreeBrowseStore.getState().setZarrSettings({ diskCache: enabled });
+  };
+  const handleZarrSettingsReset = () => {
+    const state = useFreeBrowseStore.getState();
+    state.resetZarrSettings();
+    void setGpuMemory(
+      DEFAULT_GPU_MEMORY[
+        state.activeBackend ?? preferredBackend(state.useWebGpu)
+      ],
+    );
+  };
+
   useAiCapabilities();
   const {
     refreshSessions: handleAiRefreshSessions,
@@ -301,6 +323,11 @@ function FreeBrowseView({
           onSelectZarrFrame={(id, selection) =>
             void selectZarrFrame(id, selection)
           }
+          onZarrGpuMemoryChange={(bytes) => void setGpuMemory(bytes)}
+          onZarrDiskCacheChange={(enabled) =>
+            void handleZarrDiskCacheChange(enabled)
+          }
+          onZarrSettingsReset={handleZarrSettingsReset}
           onAddSurfaceFiles={handleAddSurfaceFiles}
           getVolumes={getVolumes}
           onToggleImageVisibility={toggleImageVisibility}
@@ -364,7 +391,11 @@ function FreeBrowseView({
             onDocumentCheckboxChange={handleDocumentCheckboxChange}
             onDocumentFormatChange={handleDocumentFormatChange}
           />
-          <SettingsDialog nvRef={nvRef} />
+          <SettingsDialog
+            nvRef={nvRef}
+            onUseWebGpuChange={(use) => void setUseWebGpu(use)}
+            hostInstance={hostInstance}
+          />
           <ImagingUploadConfirmationDialog
             onConfirm={() => resolveImagingUploadConfirmation(true)}
             onCancel={() => resolveImagingUploadConfirmation(false)}
@@ -372,6 +403,10 @@ function FreeBrowseView({
           <SessionDeleteConfirmationDialog
             onConfirm={() => resolveSessionDeleteConfirmation(true)}
             onCancel={() => resolveSessionDeleteConfirmation(false)}
+          />
+          <DiskCacheConfirmationDialog
+            onConfirm={() => resolveDiskCacheConfirmation(true)}
+            onCancel={() => resolveDiskCacheConfirmation(false)}
           />
         </>
       }

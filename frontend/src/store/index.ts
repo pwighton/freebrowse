@@ -9,6 +9,8 @@ import { createSaveSlice, type SaveSlice } from "./save-slice";
 import { createLocationSlice, type LocationSlice } from "./location-slice";
 import { createAiSlice, type AiSlice } from "./ai-slice";
 import { createZarrSlice, type ZarrSlice } from "./zarr-slice";
+import { createRenderingSlice, type RenderingSlice } from "./rendering-slice";
+import { DEFAULT_ZARR_SETTINGS } from "@/lib/zarr-settings";
 
 export type FreeBrowseStore = VolumeSlice &
   SurfaceSlice &
@@ -17,7 +19,8 @@ export type FreeBrowseStore = VolumeSlice &
   SaveSlice &
   LocationSlice &
   AiSlice &
-  ZarrSlice;
+  ZarrSlice &
+  RenderingSlice;
 
 /**
  * Persistence target resolved on every call, not at store creation: the key is
@@ -74,13 +77,15 @@ export const useFreeBrowseStore = create<FreeBrowseStore>()(
       ...createLocationSlice(...a),
       ...createAiSlice(...a),
       ...createZarrSlice(...a),
+      ...createRenderingSlice(...a),
     }),
     {
       name: "freebrowse-user-settings", // label only; the key comes from config
       // The adapter is static; it resolves the key/target on every call.
       storage: createJSONStorage(() => configuredStorage),
       version: 1, // bump + add migrate() on future schema changes
-      // Persist ONLY user preferences. Everything else — niivue viewerOptions,
+      // Persist ONLY user preferences (the renderer and streaming settings
+      // among them). Everything else — niivue viewerOptions,
       // loaded volumes/surfaces, dialog-open flags, crosshair location, AI
       // sessions, save state, zarr origins, version counters — is intentionally excluded so
       // that e.g. a loaded document cannot hijack the user's defaults.
@@ -91,7 +96,20 @@ export const useFreeBrowseStore = create<FreeBrowseStore>()(
         darkMode: state.darkMode,
         sidebarOpen: state.sidebarOpen,
         footerOpen: state.footerOpen,
+        useWebGpu: state.useWebGpu,
+        zarrSettings: state.zarrSettings,
+        skipDiskCacheConfirmation: state.skipDiskCacheConfirmation,
       }),
+      // Settings saved by an older build may lack keys added since: fill them
+      // from the defaults rather than leave them undefined.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<FreeBrowseStore>;
+        return {
+          ...current,
+          ...saved,
+          zarrSettings: { ...DEFAULT_ZARR_SETTINGS, ...saved.zarrSettings },
+        };
+      },
     }
   )
 );

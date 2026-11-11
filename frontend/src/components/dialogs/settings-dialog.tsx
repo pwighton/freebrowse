@@ -14,13 +14,34 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { WEBGPU_HELP_URL, webGpuSupported } from "@/lib/rendering";
 import type { NiiVue } from "@niivue/niivue";
 
 interface SettingsDialogProps {
   nvRef: React.RefObject<NiiVue | null>;
+  /** Switch the renderer; restarts the view. */
+  onUseWebGpuChange: (useWebGpu: boolean) => void;
+  /** The viewer belongs to an embedding page, which chooses its renderer. */
+  hostInstance?: boolean;
 }
 
-export default function SettingsDialog({ nvRef }: SettingsDialogProps) {
+export default function SettingsDialog({
+  nvRef,
+  onUseWebGpuChange,
+  hostInstance = false,
+}: SettingsDialogProps) {
+  const useWebGpu = useFreeBrowseStore((s) => s.useWebGpu);
+  const activeBackend = useFreeBrowseStore((s) => s.activeBackend);
+  const skipDiskCacheConfirmation = useFreeBrowseStore(
+    (s) => s.skipDiskCacheConfirmation,
+  );
+  const setSkipDiskCacheConfirmation = useFreeBrowseStore(
+    (s) => s.setSkipDiskCacheConfirmation,
+  );
+  const hasWebGpu = webGpuSupported();
+  // Asked for WebGPU, the browser offers it, and the view still came up on
+  // WebGL2: it could not get a graphics adapter.
+  const webGpuFailed = useWebGpu && hasWebGpu && activeBackend === "webgl2";
   const settingsDialogOpen = useFreeBrowseStore((s) => s.settingsDialogOpen);
   const setSettingsDialogOpen = useFreeBrowseStore(
     (s) => s.setSettingsDialogOpen,
@@ -247,6 +268,47 @@ export default function SettingsDialog({ nvRef }: SettingsDialogProps) {
 
             <div className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Rendering
+              </h3>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="use-webgpu"
+                  checked={useWebGpu && hasWebGpu}
+                  disabled={!hasWebGpu || hostInstance}
+                  onCheckedChange={(checked) =>
+                    onUseWebGpuChange(checked === true)
+                  }
+                />
+                <Label htmlFor="use-webgpu" className="text-sm font-medium">
+                  Use WebGPU when available
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {hostInstance
+                  ? "The page embedding FreeBrowse chooses the renderer."
+                  : !hasWebGpu
+                    ? "This browser does not offer WebGPU, so FreeBrowse is using WebGL2."
+                    : webGpuFailed
+                      ? "WebGPU could not start in this browser, so FreeBrowse is using WebGL2."
+                      : activeBackend
+                        ? `Now using ${activeBackend === "webgpu" ? "WebGPU" : "WebGL2"}. WebGPU lets streamed zarr stores use more GPU memory.`
+                        : "WebGPU lets streamed zarr stores use more GPU memory."}{" "}
+                {(!hasWebGpu || webGpuFailed) && !hostInstance && (
+                  <a
+                    href={WEBGPU_HELP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    How to enable WebGPU in your browser
+                  </a>
+                )}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Confirmations
               </h3>
 
@@ -295,6 +357,22 @@ export default function SettingsDialog({ nvRef }: SettingsDialogProps) {
                   className="text-sm font-medium"
                 >
                   Don't ask me to confirm session deletions
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="skip-disk-cache-confirmation-settings"
+                  checked={skipDiskCacheConfirmation}
+                  onCheckedChange={(checked) =>
+                    setSkipDiskCacheConfirmation(checked as boolean)
+                  }
+                />
+                <Label
+                  htmlFor="skip-disk-cache-confirmation-settings"
+                  className="text-sm font-medium"
+                >
+                  Don't ask me to confirm turning on the zarr disk cache
                 </Label>
               </div>
             </div>

@@ -4,6 +4,7 @@ import { createStoreSyncTarget } from "@/store/niivue-store-sync";
 import { useViewerOptions } from "@/hooks/use-viewer-options";
 import { useVolumes } from "@/hooks/use-volumes";
 import { useFileLoading } from "@/hooks/use-file-loading";
+import { useRendering } from "@/hooks/use-rendering";
 import type { NiiVue } from "@niivue/niivue";
 import { PanelRight } from "lucide-react";
 import ViewerShell from "./viewer-shell";
@@ -40,13 +41,20 @@ export default function QaViewer({ nv }: QaViewerProps) {
     () => {},
   );
 
+  const { setUseWebGpu } = useRendering(nvRef, false);
+
   return (
     <ViewerShell
       nvInstance={nv}
       viewMode={viewerOptions.viewMode}
       onFileUpload={handleFileUpload}
       sidebar={<QaSidebar />}
-      dialogs={<SettingsDialog nvRef={nvRef} />}
+      dialogs={
+        <SettingsDialog
+          nvRef={nvRef}
+          onUseWebGpuChange={(use) => void setUseWebGpu(use)}
+        />
+      }
       nvCanvasEmptyState={
         <div className="flex flex-col items-center justify-center gap-4 text-center max-w-xl mx-auto">
           <div className="rounded-full bg-background p-3 shadow-sm">

@@ -11,7 +11,9 @@ import type {
 } from "@niivue/niivue";
 import { getFreeBrowseConfig } from "@/lib/deployment-config";
 import { describeLoadError } from "@/lib/load-errors";
-import { describeZarr, streamZarr } from "@/lib/zarr";
+import { gpuMemoryFor, preferredBackend } from "@/lib/rendering";
+import { clearZarrDiskCache, describeZarr, streamZarr } from "@/lib/zarr";
+import { budgetPlanFor } from "@/lib/zarr-settings";
 
 /** A store to stream, as asked for in the address or the sidebar. */
 export interface ZarrStoreRequest {
@@ -19,6 +21,32 @@ export interface ZarrStoreRequest {
   colormap?: string;
   channel?: number;
   timepoint?: number;
+  /** Display settings to open with, when a store is being opened again. */
+  opacity?: number;
+  calMin?: number;
+  calMax?: number;
+}
+
+/**
+ * How a streamed layer is displayed now, to carry over when its store is
+ * opened again: without this niivue would re-estimate the window and undo the
+ * user's contrast, opacity and colormap.
+ */
+function displayOf(volume: {
+  colormap?: string;
+  opacity?: number;
+  calMin?: number;
+  calMax?: number;
+}): Pick<ZarrStoreRequest, "colormap" | "opacity" | "calMin" | "calMax"> {
+  const window =
+    Number.isFinite(volume.calMin) && Number.isFinite(volume.calMax)
+      ? { calMin: volume.calMin, calMax: volume.calMax }
+      : {};
+  return {
+    colormap: volume.colormap,
+    ...(volume.opacity !== undefined ? { opacity: volume.opacity } : {}),
+    ...window,
+  };
 }
 
 /**
@@ -127,6 +155,26 @@ export function viewCentreFraction(view: {
 }
 
 /**
+ * How a stream should spend its budget right now, from the zarr settings: the
+ * options niivue takes when a store is opened, and again on a running stream.
+ */
+export function currentStreamPlan(levelCount?: number) {
+  const state = useFreeBrowseStore.getState();
+  const backend = state.activeBackend ?? preferredBackend(state.useWebGpu);
+  const settings = state.zarrSettings;
+  const finest = Math.max(0, Math.round(state.zarrFinestLevel) || 0);
+  return {
+    budgetPlan: budgetPlanFor(
+      settings,
+      gpuMemoryFor(backend, settings.gpuMemory),
+    ),
+    minLevel:
+      levelCount === undefined ? finest : Math.min(finest, levelCount - 1),
+    swapPolicy: settings.swapPolicy,
+  };
+}
+
+/**
  * The zarr view's loader: streams an OME-Zarr store as the base volume, and
  * optionally one more on top. Inert unless the UI is in zarr mode.
  */
@@ -188,10 +236,16 @@ export function useZarrStream(nvRef: React.RefObject<NiiVue | null>) {
         channel: request.channel,
         timepoint: request.timepoint,
         ...(colormap ? { colormap } : {}),
+        ...(request.opacity !== undefined ? { opacity: request.opacity } : {}),
+        ...(request.calMin !== undefined && request.calMax !== undefined
+          ? { calMin: request.calMin, calMax: request.calMax }
+          : {}),
         ...(zarrVersion ? { zarrVersion } : {}),
         // An overlay keeps the scene, and leaves the coarse backdrop to the
         // base: niivue installs every stream's floor as the base volume's.
         ...(role === "overlay" ? { replace: false, coarseFloor: false } : {}),
+        plan: currentStreamPlan(),
+        persist: useFreeBrowseStore.getState().zarrSettings.diskCache,
       });
       handlesRef.current.set(streamed.volumeId, streamed.volume);
       return {
@@ -345,18 +399,80 @@ export function useZarrStream(nvRef: React.RefObject<NiiVue | null>) {
       if (!nv) return;
       const requests: ZarrStoreRequest[] = streams().map((stream) => {
         const volume = nv.volumes.find((v) => v.id === stream.volumeId);
+        const display = volume ? displayOf(volume) : {};
+        if (stream.volumeId !== volumeId) {
+          return {
+            url: stream.url,
+            channel: stream.channel,
+            timepoint: stream.timepoint,
+            ...display,
+          };
+        }
+        // Another channel or timepoint is other data: its window is
+        // estimated afresh. Colormap and opacity are the layer's, and stay.
         return {
           url: stream.url,
-          colormap: volume?.colormap,
           channel: stream.channel,
           timepoint: stream.timepoint,
-          ...(stream.volumeId === volumeId ? selection : {}),
+          colormap: display.colormap,
+          opacity: display.opacity,
+          ...selection,
         };
       });
       if (requests.length > 0) await openZarrStores(requests);
     },
     [nvRef, openZarrStores],
   );
+
+  // Stream every open store again as it is (after a setting that only takes
+  // effect when a store is opened).
+  const reopenZarrStores = useCallback(async (): Promise<void> => {
+    const nv = nvRef.current;
+    if (!nv || streams().length === 0) return;
+    await openZarrStores(
+      streams().map((stream) => {
+        const volume = nv.volumes.find((v) => v.id === stream.volumeId);
+        return {
+          url: stream.url,
+          channel: stream.channel,
+          timepoint: stream.timepoint,
+          ...(volume ? displayOf(volume) : {}),
+        };
+      }),
+    );
+  }, [nvRef, openZarrStores]);
+
+  // Settings that niivue takes on a running stream: apply them as they change.
+  const zarrSettings = useFreeBrowseStore((s) => s.zarrSettings);
+  const zarrFinestLevel = useFreeBrowseStore((s) => s.zarrFinestLevel);
+  const activeBackend = useFreeBrowseStore((s) => s.activeBackend);
+  useEffect(() => {
+    for (const stream of streams()) {
+      const handle = handlesRef.current.get(stream.volumeId);
+      if (!handle) continue;
+      const plan = currentStreamPlan(stream.description.levels.length);
+      handle.setSwapPolicy(plan.swapPolicy);
+      void handle
+        .setBudgetPlan(plan.budgetPlan)
+        .then(() => handle.setMaxDetail(plan.minLevel))
+        .catch((error) => console.error("Error applying zarr settings:", error));
+    }
+  }, [zarrSettings, zarrFinestLevel, activeBackend]);
+
+  // The disk cache is chosen when a store is opened: open them again when it
+  // changes, and delete what was stored once it is off.
+  const diskCacheRef = useRef(zarrSettings.diskCache);
+  useEffect(() => {
+    if (diskCacheRef.current === zarrSettings.diskCache) return;
+    diskCacheRef.current = zarrSettings.diskCache;
+    void reopenZarrStores().then(() => {
+      if (!zarrSettings.diskCache) {
+        return clearZarrDiskCache().catch((error) =>
+          console.error("Error clearing the zarr disk cache:", error),
+        );
+      }
+    });
+  }, [zarrSettings.diskCache, reopenZarrStores]);
 
   // Follow niivue: forget streams whose volume was removed, and report how
   // much of the viewed part is still arriving.
@@ -420,6 +536,9 @@ export function useZarrStream(nvRef: React.RefObject<NiiVue | null>) {
 
     const refocus = () => {
       timer = null;
+      // A uniform plan has no focus to move.
+      if (useFreeBrowseStore.getState().zarrSettings.detailPreset === "uniform")
+        return;
       const base = streams()[0];
       const handle = base && handlesRef.current.get(base.volumeId);
       if (!handle) return;
@@ -465,6 +584,7 @@ export function useZarrStream(nvRef: React.RefObject<NiiVue | null>) {
     addZarrStore,
     openZarrStores,
     selectZarrFrame,
+    reopenZarrStores,
     handlesRef,
   };
 }

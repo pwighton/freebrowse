@@ -1,5 +1,12 @@
 import { useFreeBrowseStore } from "@/store";
-import { FileText, Box, Brain, Database, Pencil } from "lucide-react";
+import {
+  FileText,
+  Box,
+  Brain,
+  Database,
+  Pencil,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useCapabilities } from "@/lib/capabilities";
@@ -11,6 +18,7 @@ import SceneDetailsTab from "@/components/tabs/scene-details-tab";
 import SurfaceDetailsTab from "@/components/tabs/surface-details-tab";
 import DrawingTab from "@/components/tabs/drawing-tab";
 import AiAnnotationTab from "@/components/tabs/ai-annotation-tab";
+import ZarrSettingsTab from "@/components/tabs/zarr-settings-tab";
 import { Sparkles } from "lucide-react";
 
 interface SidebarProps {
@@ -26,6 +34,10 @@ interface SidebarProps {
     volumeId: string,
     selection: { channel?: number; timepoint?: number },
   ) => void;
+  // Zarr settings
+  onZarrGpuMemoryChange: (bytes: number) => void;
+  onZarrDiskCacheChange: (enabled: boolean) => void;
+  onZarrSettingsReset: () => void;
   onAddSurfaceFiles: () => void;
   // Volume operations
   getVolumes: () => NVImage[];
@@ -87,6 +99,7 @@ export default function Sidebar(props: SidebarProps) {
   const drawingOptions = useFreeBrowseStore((s) => s.drawingOptions);
   const aiEnabled = useFreeBrowseStore((s) => s.aiEnabled);
   const capabilities = useCapabilities();
+  const zarrMode = useFreeBrowseStore((s) => s.appMode === "zarr");
   const showAiTab =
     capabilities.ai && !props.serverlessMode && aiEnabled === true;
   const showBackendTabs = capabilities.backendBrowse && !props.serverlessMode;
@@ -109,6 +122,15 @@ export default function Sidebar(props: SidebarProps) {
           >
             <Box className="h-4 w-4 mr-2" />
           </TabsTrigger>
+          {zarrMode && (
+            <TabsTrigger
+              value="zarrSettings"
+              title="Zarr settings"
+              className="data-[state=active]:bg-muted"
+            >
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+            </TabsTrigger>
+          )}
           {capabilities.surfaces && (
             <TabsTrigger
               value="surfaceDetails"
@@ -173,6 +195,17 @@ export default function Sidebar(props: SidebarProps) {
             onMoveVolumeDown={props.onMoveVolumeDown}
           />
         </TabsContent>
+
+        {zarrMode && (
+          <TabsContent value="zarrSettings" className="flex-1 min-h-0 p-0">
+            <ZarrSettingsTab
+              nvRef={props.nvRef}
+              onGpuMemoryChange={props.onZarrGpuMemoryChange}
+              onDiskCacheChange={props.onZarrDiskCacheChange}
+              onReset={props.onZarrSettingsReset}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="surfaceDetails" className="flex-1 min-h-0 p-0">
           <SurfaceDetailsTab

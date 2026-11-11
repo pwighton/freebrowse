@@ -92,6 +92,22 @@ export class NiiVue extends EventTarget {
 
   private _props: Record<string, unknown> = {};
 
+  /** Construction options niivue keeps and re-reads when a view starts. */
+  opts: { backend?: string; maxChunkResidencyBytes?: number } = {};
+  backend: string | undefined = undefined;
+
+  /** Restart the view, on another backend when asked. Emits viewAttached. */
+  async reinitializeView(options: { backend?: string } = {}): Promise<boolean> {
+    this.backend = options.backend ?? this.backend ?? "webgl2";
+    this.opts.backend = this.backend;
+    this.emit("viewAttached", { canvas: this.canvas, backend: this.backend });
+    return true;
+  }
+
+  chunkStreamStats(): null {
+    return null;
+  }
+
   constructor(opts?: Record<string, unknown>) {
     super();
     void opts;

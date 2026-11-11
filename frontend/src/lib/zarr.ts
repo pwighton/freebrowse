@@ -11,7 +11,11 @@
  * The niivue extension is imported lazily so zarrita stays out of the main
  * bundle until a store is actually opened.
  */
-import type { NiiVue, NVChunkedVolume } from "@niivue/niivue";
+import type {
+  ChunkedVolumeOptions,
+  NiiVue,
+  NVChunkedVolume,
+} from "@niivue/niivue";
 import type { OmeZarrSource } from "@niivue/nv-ext-tile/zarr";
 
 /**
@@ -288,11 +292,29 @@ export interface StreamZarrOptions {
   /** Layer opacity, 0 to 1. */
   opacity?: number;
   /**
+   * Display window. Unset, niivue estimates one from the data; give both to
+   * keep a window the user chose.
+   */
+  calMin?: number;
+  calMax?: number;
+  /**
    * Show the store's coarsest level behind bricks that have not arrived.
    * Default true. Pass false for a store added on top of another: niivue
    * installs every stream's floor as the BASE volume's.
    */
   coarseFloor?: boolean;
+  /**
+   * How the stream spends its budget: niivue's plan, the finest level it may
+   * use, and what a refocus does with replaced bricks. All three can also be
+   * changed on the returned handle while it streams.
+   */
+  plan?: Pick<ChunkedVolumeOptions, "budgetPlan" | "minLevel" | "swapPolicy">;
+  /**
+   * Keep the store's downloaded bytes in the browser's Cache Storage, so a
+   * later session streams from disk. Off by default: it writes the user's
+   * data to their disk (see {@link clearZarrDiskCache}).
+   */
+  persist?: boolean;
 }
 
 export interface StreamedZarr {
@@ -336,16 +358,27 @@ export async function streamZarr(
       timepoint: options.timepoint,
       replace: options.replace ?? true,
       ...(zarrVersion ? { zarrVersion } : {}),
+      ...(options.persist ? { persist: true } : {}),
     },
     {
       name,
       ...(options.colormap ? { colormap: options.colormap } : {}),
       ...(options.opacity !== undefined ? { opacity: options.opacity } : {}),
+      ...(options.calMin !== undefined && options.calMax !== undefined
+        ? { calMin: options.calMin, calMax: options.calMax }
+        : {}),
       ...(options.coarseFloor !== undefined
         ? { coarseFloor: options.coarseFloor }
         : {}),
+      ...options.plan,
     },
   );
   const added = nv.volumes.find((v) => v.id && !before.has(v.id));
   return { description, volume, volumeId: added?.id ?? "", channel };
+}
+
+/** Delete everything streamed stores have written to the browser's storage. */
+export async function clearZarrDiskCache(): Promise<void> {
+  const zarr = await loadZarrModule();
+  await zarr.clearPersistentByteCaches();
 }
