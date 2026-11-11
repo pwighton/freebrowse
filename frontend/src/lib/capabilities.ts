@@ -6,6 +6,7 @@
  * reads or writes voxels (drawing, the magic wand, AI annotation, saving) and
  * everything that assumes millimetre scanner space (surfaces) is switched off.
  */
+import type { DragMode } from "@/components/drag-mode-selector";
 import { useFreeBrowseStore } from "@/store";
 
 export type FreeBrowseMode = "default" | "zarr";
@@ -50,4 +51,18 @@ export function capabilitiesFor(mode: FreeBrowseMode): Capabilities {
 /** The capabilities of the mode the mounted UI is in. */
 export function useCapabilities(): Capabilities {
   return capabilitiesFor(useFreeBrowseStore((s) => s.appMode));
+}
+
+/**
+ * The right-drag mode to enter a view with. niivue's `contrast` drag sets the
+ * window from the voxels in the dragged box, which a streamed volume does not
+ * have in memory, so the zarr view offers `windowing` (drag for width and
+ * level) in its place; each view swaps out the other's.
+ */
+export function rightDragModeFor(
+  mode: FreeBrowseMode,
+  current: DragMode,
+): DragMode {
+  if (mode === "zarr") return current === "contrast" ? "windowing" : current;
+  return current === "windowing" ? "contrast" : current;
 }

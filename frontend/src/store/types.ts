@@ -50,6 +50,11 @@ export type LocationData = {
     name: string;
     voxel: [number, number, number];
     value: number;
+    /**
+     * The volume is streamed: its voxels are not in memory, so niivue has no
+     * value to report (it gives 0).
+     */
+    streamed?: boolean;
   }>;
 };
 

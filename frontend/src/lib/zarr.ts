@@ -53,6 +53,8 @@ export interface ZarrDescription {
   timepoints: number;
   /** The level a whole-level load picks when none is given. */
   defaultLevel: number;
+  /** The store's zarr format, when its OME-NGFF version states it. */
+  zarrVersion?: 2 | 3;
 }
 
 export interface LoadZarrLevelOptions {
@@ -159,6 +161,7 @@ function describe(
     channels,
     timepoints: source.timepointCount,
     defaultLevel,
+    zarrVersion: zarrVersionOf(source),
   };
 }
 
@@ -282,6 +285,14 @@ export interface StreamZarrOptions {
   /** The store's format when already known (see {@link probeZarr}). */
   zarrVersion?: 2 | 3;
   colormap?: string;
+  /** Layer opacity, 0 to 1. */
+  opacity?: number;
+  /**
+   * Show the store's coarsest level behind bricks that have not arrived.
+   * Default true. Pass false for a store added on top of another: niivue
+   * installs every stream's floor as the BASE volume's.
+   */
+  coarseFloor?: boolean;
 }
 
 export interface StreamedZarr {
@@ -309,7 +320,7 @@ export async function streamZarr(
   );
   // niivue opens the store again for the stream. Tell it the format the first
   // open found, so it does not repeat the v3-then-v2 probe.
-  const zarrVersion = options.zarrVersion ?? zarrVersionOf(source);
+  const zarrVersion = options.zarrVersion ?? description.zarrVersion;
   const channel = options.channel ?? 0;
   const name = volumeName(
     storeLabel(description.url, source),
@@ -326,7 +337,14 @@ export async function streamZarr(
       replace: options.replace ?? true,
       ...(zarrVersion ? { zarrVersion } : {}),
     },
-    { name, ...(options.colormap ? { colormap: options.colormap } : {}) },
+    {
+      name,
+      ...(options.colormap ? { colormap: options.colormap } : {}),
+      ...(options.opacity !== undefined ? { opacity: options.opacity } : {}),
+      ...(options.coarseFloor !== undefined
+        ? { coarseFloor: options.coarseFloor }
+        : {}),
+    },
   );
   const added = nv.volumes.find((v) => v.id && !before.has(v.id));
   return { description, volume, volumeId: added?.id ?? "", channel };

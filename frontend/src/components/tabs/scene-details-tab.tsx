@@ -3,6 +3,7 @@ import { useFreeBrowseStore } from "@/store";
 import {
   ImageIcon,
   Link,
+  Plus,
   Upload,
   Trash2,
   Eye,
@@ -23,8 +24,9 @@ import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useCapabilities } from "@/lib/capabilities";
 import { ZARR_SUPPORTED } from "@/lib/zarr";
+import { MAX_ZARR_OVERLAYS } from "@/hooks/use-zarr-stream";
 import { deploymentConfig } from "@/lib/deployment-config";
-import type { ZarrVolumeOrigin } from "@/store/zarr-slice";
+import type { ZarrStream, ZarrVolumeOrigin } from "@/store/zarr-slice";
 import type { NiiVue, NVImage } from "@niivue/niivue";
 
 interface SceneDetailsTabProps {
@@ -37,6 +39,13 @@ interface SceneDetailsTabProps {
   onRemoveVolume: (index: number) => void;
   onAddMoreFiles: () => void;
   onLoadUrl: (url: string) => void;
+  /** Zarr view: stream a store on top of the base. */
+  onAddZarrStore: (url: string) => void;
+  /** Zarr view: show another channel or timepoint of a streamed store. */
+  onSelectZarrFrame: (
+    volumeId: string,
+    selection: { channel?: number; timepoint?: number },
+  ) => void;
   onCreateDrawingLayer: () => void;
   onSaveScene: (isDownload: boolean) => void;
   onOpacityChange: (value: number) => void;
@@ -56,6 +65,58 @@ function zarrSummary(origin: ZarrVolumeOrigin): string {
   return `zarr level ${origin.level}/${origin.levelCount - 1} (0 = finest), ${spacing} µm`;
 }
 
+/** Channel and timepoint pickers for a streamed store that has several. */
+function ZarrFrameSelect({
+  stream,
+  disabled,
+  onSelect,
+}: {
+  stream: ZarrStream;
+  disabled: boolean;
+  onSelect: (selection: { channel?: number; timepoint?: number }) => void;
+}) {
+  const { channels, timepoints } = stream.description;
+  if (channels.length <= 1 && timepoints <= 1) return null;
+  return (
+    <>
+      {channels.length > 1 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Channel</Label>
+          <Select
+            aria-label="Channel"
+            value={String(stream.channel)}
+            disabled={disabled}
+            onChange={(e) => onSelect({ channel: Number(e.target.value) })}
+          >
+            {channels.map((name, index) => (
+              <option key={index} value={index}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+      {timepoints > 1 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Timepoint</Label>
+          <Select
+            aria-label="Timepoint"
+            value={String(stream.timepoint)}
+            disabled={disabled}
+            onChange={(e) => onSelect({ timepoint: Number(e.target.value) })}
+          >
+            {Array.from({ length: timepoints }, (_, index) => (
+              <option key={index} value={index}>
+                {index + 1} of {timepoints}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function SceneDetailsTab({
   nvRef,
   serverlessMode,
@@ -66,6 +127,8 @@ export default function SceneDetailsTab({
   onRemoveVolume,
   onAddMoreFiles,
   onLoadUrl,
+  onAddZarrStore,
+  onSelectZarrFrame,
   onCreateDrawingLayer,
   onSaveScene,
   onOpacityChange,
@@ -89,10 +152,22 @@ export default function SceneDetailsTab({
   const zarrMode = useFreeBrowseStore((s) => s.appMode === "zarr");
   const [urlText, setUrlText] = useState("");
 
+  const zarrStreams = useFreeBrowseStore((s) => s.zarrStreams);
+  // A second streamed store can go on top of the base, and only one.
+  const canAddZarrStore =
+    zarrMode &&
+    zarrStreams.length >= 1 &&
+    zarrStreams.length - 1 < MAX_ZARR_OVERLAYS;
+
   const submitUrl = (event: React.FormEvent) => {
     event.preventDefault();
     if (!urlText.trim() || urlLoading) return;
     onLoadUrl(urlText);
+    setUrlText("");
+  };
+  const addUrl = () => {
+    if (!urlText.trim() || urlLoading) return;
+    onAddZarrStore(urlText);
     setUrlText("");
   };
 
@@ -100,6 +175,9 @@ export default function SceneDetailsTab({
   const volumes = getVolumes();
   const currentVolume =
     currentImageIndex !== null ? volumes[currentImageIndex] : null;
+  const currentStream = currentVolume
+    ? zarrStreams.find((stream) => stream.volumeId === currentVolume.id)
+    : undefined;
 
   return (
     <div className="flex flex-col h-full">
@@ -209,7 +287,10 @@ export default function SceneDetailsTab({
               Load volumes
             </Button>
           )}
-          <form className="flex gap-2" onSubmit={submitUrl}>
+          <form
+            className={cn("flex gap-2", zarrMode && "flex-wrap")}
+            onSubmit={submitUrl}
+          >
             <Input
               type="text"
               aria-label={
@@ -226,7 +307,7 @@ export default function SceneDetailsTab({
                     ? "Volume or OME-Zarr URL"
                     : "Volume URL"
               }
-              className="h-8 text-xs"
+              className={cn("h-8 text-xs", zarrMode && "basis-full")}
               value={urlText}
               onChange={(e) => setUrlText(e.target.value)}
               disabled={urlLoading}
@@ -235,12 +316,33 @@ export default function SceneDetailsTab({
               type="submit"
               variant="outline"
               size="sm"
+              className={cn(zarrMode && "flex-1")}
               disabled={!urlText.trim() || urlLoading}
               title={zarrMode ? "Stream this store" : "Load from URL"}
             >
               <Link className="mr-2 h-4 w-4" />
               {urlLoading ? "Loading" : zarrMode ? "Open" : "Load"}
             </Button>
+            {zarrMode && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={addUrl}
+                disabled={!urlText.trim() || urlLoading || !canAddZarrStore}
+                title={
+                  canAddZarrStore
+                    ? "Stream this store on top of the base store"
+                    : zarrStreams.length === 0
+                      ? "Open a base store first"
+                      : "Only one store can be streamed on top of the base"
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            )}
           </form>
           {capabilities.drawing && (
             <Button
@@ -294,31 +396,42 @@ export default function SceneDetailsTab({
       <ScrollArea className="flex-1 min-h-0">
         {currentVolume ? (
           <div className="grid gap-4 p-4">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={onMoveVolumeUp}
-                disabled={currentImageIndex === null || currentImageIndex === 0}
-              >
-                <ChevronUp className="mr-2 h-4 w-4" />
-                Move up
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={onMoveVolumeDown}
-                disabled={
-                  currentImageIndex === null ||
-                  currentImageIndex === volumes.length - 1
+            {!zarrMode && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={onMoveVolumeUp}
+                  disabled={currentImageIndex === null || currentImageIndex === 0}
+                >
+                  <ChevronUp className="mr-2 h-4 w-4" />
+                  Move up
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={onMoveVolumeDown}
+                  disabled={
+                    currentImageIndex === null ||
+                    currentImageIndex === volumes.length - 1
+                  }
+                >
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                  Move down
+                </Button>
+              </div>
+            )}
+            {currentStream && (
+              <ZarrFrameSelect
+                stream={currentStream}
+                disabled={urlLoading}
+                onSelect={(selection) =>
+                  onSelectZarrFrame(currentStream.volumeId, selection)
                 }
-              >
-                <ChevronDown className="mr-2 h-4 w-4" />
-                Move down
-              </Button>
-            </div>
+              />
+            )}
             {(currentVolume.nFrame4D || 1) > 1 && (
               <LabeledSliderWithInput
                 label="Frame"

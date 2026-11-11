@@ -17,7 +17,7 @@ import {
   resolveSessionDeleteConfirmation,
 } from "@/lib/confirmations";
 import type { NiiVue } from "@niivue/niivue";
-import type { FreeBrowseMode } from "@/lib/capabilities";
+import { rightDragModeFor, type FreeBrowseMode } from "@/lib/capabilities";
 import { getFreeBrowseConfig } from "@/lib/deployment-config";
 import { useFreeBrowseStore } from "@/store";
 import ViewerShell from "./viewer-shell";
@@ -89,7 +89,8 @@ async function resetScene(nv: NiiVue): Promise<void> {
     showUploader: true,
     locationData: null,
     zarrVolumes: {},
-    zarrStream: null,
+    zarrStreams: [],
+    zarrProgress: null,
     urlLoadStatus: { state: "idle" },
     activeTab: "sceneDetails",
     drawingOptions: { ...state.drawingOptions, enabled: false, mode: "none" },
@@ -116,6 +117,10 @@ export default function FreeBrowse(props: FreeBrowseProps) {
       if (sceneMode !== null && sceneMode !== mode) await resetScene(nv);
       sceneMode = mode;
       useFreeBrowseStore.getState().setAppMode(mode);
+      useFreeBrowseStore.getState().setViewerOptions((options) => ({
+        ...options,
+        dragMode: rightDragModeFor(mode, options.dragMode),
+      }));
       if (!cancelled) setReady(true);
     })();
     return () => {
@@ -261,7 +266,8 @@ function FreeBrowseView({
     updateSurfaceDetails,
   );
 
-  const { openZarrStore } = useZarrStream(nvRef);
+  const { openZarrStore, addZarrStore, selectZarrFrame } =
+    useZarrStream(nvRef);
 
   useAiCapabilities();
   const {
@@ -290,6 +296,10 @@ function FreeBrowseView({
           onAddMoreFiles={handleAddMoreFiles}
           onLoadUrl={
             mode === "zarr" ? (url) => void openZarrStore(url) : handleUrlLoad
+          }
+          onAddZarrStore={(url) => void addZarrStore(url)}
+          onSelectZarrFrame={(id, selection) =>
+            void selectZarrFrame(id, selection)
           }
           onAddSurfaceFiles={handleAddSurfaceFiles}
           getVolumes={getVolumes}

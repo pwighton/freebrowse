@@ -21,6 +21,11 @@ interface SidebarProps {
   onImagingFileSelect: (file: FileItem) => void;
   onAddMoreFiles: () => void;
   onLoadUrl: (url: string) => void;
+  onAddZarrStore: (url: string) => void;
+  onSelectZarrFrame: (
+    volumeId: string,
+    selection: { channel?: number; timepoint?: number },
+  ) => void;
   onAddSurfaceFiles: () => void;
   // Volume operations
   getVolumes: () => NVImage[];
@@ -155,6 +160,8 @@ export default function Sidebar(props: SidebarProps) {
             onRemoveVolume={props.onRemoveVolumeClick}
             onAddMoreFiles={props.onAddMoreFiles}
             onLoadUrl={props.onLoadUrl}
+            onAddZarrStore={props.onAddZarrStore}
+            onSelectZarrFrame={props.onSelectZarrFrame}
             onCreateDrawingLayer={props.onCreateDrawingLayer}
             onSaveScene={props.onSaveScene}
             onOpacityChange={props.onOpacityChange}

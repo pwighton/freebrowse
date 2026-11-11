@@ -71,7 +71,7 @@ export default function Header({ nvRef }: HeaderProps) {
               <DragModeSelector
                 currentMode={viewerOptions.dragMode}
                 onModeChange={handleDragModeChange}
-                availableModes={["contrast", "pan"]}
+                availableModes={zarrMode ? ["windowing", "pan"] : ["contrast", "pan"]}
               />
             </div>
           </div>

@@ -202,10 +202,11 @@ export class NiiVue extends EventTarget {
   }
 
   removeVolume(index: number): void {
-    // Emit BEFORE removal, matching real niivue-mono (item present at emit time).
+    // Emit AFTER removal, as niivue does since 1.0.0-rc.4x: every event fires
+    // once the model has changed, and `detail` carries the removed item.
     const volume = this.volumes[index];
-    this.emit("volumeRemoved", { volume, index });
     this.volumes.splice(index, 1);
+    this.emit("volumeRemoved", { volume, index });
   }
 
   async setVolume(
@@ -268,10 +269,10 @@ export class NiiVue extends EventTarget {
   }
 
   removeMesh(index: number): void {
-    // Emit BEFORE removal, matching real niivue-mono.
+    // Emit AFTER removal, as niivue does (see removeVolume).
     const mesh = this.meshes[index];
-    this.emit("meshRemoved", { mesh, index });
     this.meshes.splice(index, 1);
+    this.emit("meshRemoved", { mesh, index });
   }
 
   async setMesh(
@@ -388,7 +389,7 @@ export class NiiVue extends EventTarget {
   }
 
   get colormaps(): string[] {
-    return ["Gray", "Hot", "Cool", "Winter", "Freesurfer"];
+    return ["Gray", "Hot", "Cool", "Winter", "Red", "Freesurfer"];
   }
   get meshShaders(): string[] {
     return ["phong", "matcap", "outline"];

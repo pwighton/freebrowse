@@ -22,6 +22,7 @@ export default function CanvasArea({
   const showUploader = useFreeBrowseStore((s) => s.showUploader);
   const urlLoadStatus = useFreeBrowseStore((s) => s.urlLoadStatus);
   const setUrlLoadStatus = useFreeBrowseStore((s) => s.setUrlLoadStatus);
+  const zarrProgress = useFreeBrowseStore((s) => s.zarrProgress);
 
   return (
     <main className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -31,6 +32,16 @@ export default function CanvasArea({
           className="absolute left-1/2 top-3 z-10 max-w-[80%] -translate-x-1/2 truncate rounded-md border bg-background px-3 py-1.5 text-sm shadow"
         >
           Loading {urlLoadStatus.url}
+        </div>
+      )}
+      {zarrProgress && zarrProgress.remaining > 0 && !showUploader && (
+        <div
+          role="status"
+          aria-label="Streaming progress"
+          className="absolute bottom-3 left-3 z-10 rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow"
+        >
+          Streaming detail: {zarrProgress.remaining}{" "}
+          {zarrProgress.remaining === 1 ? "brick" : "bricks"} to go
         </div>
       )}
       {urlLoadStatus.state === "error" && (

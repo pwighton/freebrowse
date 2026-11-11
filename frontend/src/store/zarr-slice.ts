@@ -20,19 +20,30 @@ export type UrlLoadStatus =
   | { state: "loading"; url: string }
   | { state: "error"; url: string; message: string };
 
-/** The store being streamed in the zarr view. */
+/** One store streamed in the zarr view. */
 export interface ZarrStream {
+  /** The URL the store was asked for by. */
+  url: string;
   description: ZarrDescription;
   /** Id of the streamed volume in `nv.volumes`. */
   volumeId: string;
   channel: number;
+  timepoint: number;
+}
+
+/** Bricks still to arrive for the part of the stream being viewed. */
+export interface ZarrProgress {
+  remaining: number;
+  total: number;
 }
 
 export interface ZarrSlice {
   /** Which UI is mounted (see `lib/capabilities.ts`). */
   appMode: FreeBrowseMode;
-  /** The zarr view's stream, or null when nothing is open. */
-  zarrStream: ZarrStream | null;
+  /** The zarr view's streams: the base store first, then any overlay. */
+  zarrStreams: ZarrStream[];
+  /** Set while bricks are arriving; null once the view has settled. */
+  zarrProgress: ZarrProgress | null;
   /**
    * Zarr origin by niivue volume id. Entries for volumes that have since been
    * removed are harmless and are not pruned.
@@ -42,12 +53,14 @@ export interface ZarrSlice {
   addZarrVolumes: (ids: string[], origin: ZarrVolumeOrigin) => void;
   setUrlLoadStatus: (status: UrlLoadStatus) => void;
   setAppMode: (mode: FreeBrowseMode) => void;
-  setZarrStream: (stream: ZarrStream | null) => void;
+  setZarrStreams: (streams: ZarrStream[]) => void;
+  setZarrProgress: (progress: ZarrProgress | null) => void;
 }
 
 export const createZarrSlice: StateCreator<ZarrSlice> = (set) => ({
   appMode: "default",
-  zarrStream: null,
+  zarrStreams: [],
+  zarrProgress: null,
   zarrVolumes: {},
   urlLoadStatus: { state: "idle" },
   addZarrVolumes: (ids, origin) =>
@@ -59,5 +72,6 @@ export const createZarrSlice: StateCreator<ZarrSlice> = (set) => ({
     })),
   setUrlLoadStatus: (urlLoadStatus) => set({ urlLoadStatus }),
   setAppMode: (appMode) => set({ appMode }),
-  setZarrStream: (zarrStream) => set({ zarrStream }),
+  setZarrStreams: (zarrStreams) => set({ zarrStreams }),
+  setZarrProgress: (zarrProgress) => set({ zarrProgress }),
 });

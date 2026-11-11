@@ -215,11 +215,11 @@ export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
 
     onSurfacesChanged() {
       // Rebuild the derived surfaces list from live nv.meshes (the old
-      // updateSurfaceDetails, now event-driven). niivue-mono emits *Removed
-      // BEFORE mutating the model (the removed item is still present at emit
-      // time), so read nv.meshes on a microtask — after the synchronous
-      // add/remove completes — to capture the post-mutation list. (Volumes
-      // avoid this by reading nv.volumes at render via the version counter.)
+      // updateSurfaceDetails, now event-driven). Early niivue-mono releases
+      // emitted *Removed BEFORE mutating the model; current ones emit after.
+      // Reading nv.meshes on a microtask — after the synchronous add/remove
+      // completes — captures the post-mutation list under either order.
+      // (Volumes read nv.volumes at render via the version counter.)
       queueMicrotask(() => {
         const meshes = nv.meshes as MeshLike[];
         store().setSurfaces(
@@ -261,6 +261,11 @@ export function createStoreSyncTarget(nv: NiiVueReader): NiiVueSyncTarget {
       const voxels = (detail.values ?? []).map((v, index) => {
         const vox = v.vox ?? [0, 0, 0];
         return {
+          // A streamed volume has a chunk source and no voxels in memory.
+          ...((nv.volumes[index] as { chunkSource?: unknown } | undefined)
+            ?.chunkSource
+            ? { streamed: true }
+            : {}),
           name: v.name || `Volume ${index + 1}`,
           voxel: [
             Math.round(vox[0]),
