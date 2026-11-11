@@ -11,6 +11,7 @@ import { useSave } from "@/hooks/use-save";
 import { useFileLoading } from "@/hooks/use-file-loading";
 import { useZarrStream } from "@/hooks/use-zarr-stream";
 import { useRendering } from "@/hooks/use-rendering";
+import { useDeepZoom } from "@/hooks/use-deep-zoom";
 import { useAiCapabilities } from "@/hooks/use-ai-capabilities";
 import { useAiSession } from "@/hooks/use-ai-session";
 import {
@@ -275,6 +276,8 @@ function FreeBrowseView({
     useZarrStream(nvRef);
 
   const { setUseWebGpu, setGpuMemory } = useRendering(nvRef, hostInstance);
+  // Zarr view: the wheel zooms past niivue's 10x limit.
+  useDeepZoom(nvRef);
 
   // The disk cache writes streamed data to the browser's storage: ask first.
   const handleZarrDiskCacheChange = async (enabled: boolean) => {
